@@ -35,7 +35,6 @@ jobs:
           node test/screenshot.mjs
           cp test/output/1920x1080-01-idle.png docs/preview-hd.png
           cp test/output/1920x1080-03-click-piplup.png docs/hd/preview-click.png
-          cp test/output/1920x1080-11-scene-mamoswineRide.png docs/hd/preview-ride.png
       - name: Commit results
         run: |
           git config user.name "github-actions[bot]"
