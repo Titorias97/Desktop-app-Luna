@@ -1,0 +1,68 @@
+{
+  "name": "luna-wallpaper",
+  "productName": "Luna",
+  "version": "0.1.0",
+  "description": "Interactive animated pixel-art wallpaper: a gothic girl and her ghost Pok\u00e9mon living on your desktop.",
+  "main": "src/main/main.js",
+  "private": true,
+  "license": "MIT",
+  "author": "titorias97",
+  "scripts": {
+    "start": "electron .",
+    "preview": "node scripts/preview-server.js",
+    "assets": "node scripts/build-pokemon.js && node scripts/build-girl.js && node scripts/build-icons.js",
+    "assets:pokemon": "node scripts/build-pokemon.js",
+    "assets:girl": "node scripts/build-girl.js",
+    "assets:icons": "node scripts/build-icons.js",
+    "test": "node test/main-smoke.js && node test/screenshot.mjs",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "koffi": "^3.3.2"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "omggif": "^1.0.10",
+    "pngjs": "^7.0.0",
+    "playwright": "1.56.1"
+  },
+  "build": {
+    "appId": "com.titorias97.luna",
+    "productName": "Luna",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/koffi/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true
+    }
+  }
+}
