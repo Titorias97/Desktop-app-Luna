@@ -40,8 +40,11 @@ const config = {
 };
 fs.writeFileSync(path.join(tmp, 'config.json'), JSON.stringify(config));
 const out = path.join(ROOT, 'src/renderer/assets/hd');
-const backup = {};
-for (const f of ['bg.js', 'luna.js', 'bg.png', 'luna.png', 'luna.json']) { const p = path.join(out, f); if (fs.existsSync(p)) backup[f] = fs.readFileSync(p); }
+// Everything the build may write: snapshot it so the real assets survive the test.
+const outputs = ['bg.js', 'luna.js', 'bg.png', 'luna.png', 'luna.json'].map((f) => path.join(out, f))
+  .concat([path.join(ROOT, 'docs/luna-hd.png'), path.join(ROOT, 'docs/hd/luna-hd-sheet.png')]);
+const backup = new Map();
+for (const p of outputs) if (fs.existsSync(p)) backup.set(p, fs.readFileSync(p));
 try {
   let log;
   try {
@@ -61,12 +64,9 @@ try {
   if (process.argv.includes('--keep')) { console.log('keeping synthetic HD assets in place'); process.exit(0); }
 } finally {
   if (!process.argv.includes('--keep')) {
-    for (const f of ['bg.js', 'luna.js', 'bg.png', 'luna.png', 'luna.json']) {
-      const p = path.join(out, f);
-      if (backup[f]) fs.writeFileSync(p, backup[f]); else if (fs.existsSync(p)) fs.unlinkSync(p);
+    for (const p of outputs) {
+      if (backup.has(p)) fs.writeFileSync(p, backup.get(p)); else if (fs.existsSync(p)) fs.unlinkSync(p);
     }
-    const strip = path.join(ROOT, 'docs/hd/luna-hd-sheet.png'); if (fs.existsSync(strip)) fs.unlinkSync(strip);
-    const design = path.join(ROOT, 'docs/luna-hd.png'); if (fs.existsSync(design)) fs.unlinkSync(design);
   }
   fs.rmSync(tmp, { recursive: true, force: true });
 }
