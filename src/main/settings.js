@@ -7,6 +7,9 @@ const DEFAULTS = {
   bottomInset: 48,   // physical pixels kept free at the bottom (taskbar)
   interactive: true, // react to the cursor
   fps: 30,
+  luna: 'hd',     // 'hd' (Higgsfield sprite) | 'classic' (hand-drawn)
+  bg: 'hd',       // 'hd' (Higgsfield picture) | 'classic' (procedural graveyard)
+  detail: 'hd',   // 'hd' (full-resolution picture) | 'pixel' (snapped to the sprite grid)
   displays: 'primary', // 'primary' | 'all'
   paused: false,
   pauseWhenCovered: true, // also pause behind maximized windows (saves battery)
@@ -29,8 +32,8 @@ class Settings {
   }
   /** The subset the renderer cares about. */
   forRenderer() {
-    const { scale, bottomInset, interactive, fps } = this.data;
-    return { scale, bottomInset, interactive, fps };
+    const { scale, bottomInset, interactive, fps, luna, bg, detail } = this.data;
+    return { scale, bottomInset, interactive, fps, luna, bg, detail };
   }
 }
 

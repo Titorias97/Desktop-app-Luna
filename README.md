@@ -5,7 +5,11 @@ black lolita dress lives in a moonlit graveyard with her Pokémon — **Gengar,
 Chandelure, Mega Froslass, Mega Altaria, Piplup, Drifblim, Mamoswine, Lunatone
 and Espeon** — and plays with them all night.
 
-![idle scene](docs/preview.png)
+![idle scene](docs/preview-hd.png)
+
+*The HD look: a Higgsfield-generated graveyard and Luna sprite. The original
+hand-drawn version is still there (`docs/preview.png`) and can be switched
+back on from the tray menu.*
 
 ## What it does
 
@@ -25,6 +29,28 @@ and Espeon** — and plays with them all night.
   will-o'-wisps and fog. The moon shows the **real lunar phase** for today.
 - Pauses behind fullscreen apps, on the lock screen and while the PC sleeps.
   Caps itself at 30 fps (configurable) so it stays light.
+
+## HD assets (Higgsfield)
+
+The background picture and Luna's HD sprite sheet were generated with
+Higgsfield (GPT Image 2.5): one 16:9 pixel-art graveyard, one character
+design, and one 12-pose sheet drawn from that design as a reference. The
+pipeline in `scripts/hd-assets.js` / `scripts/hd-build.js` downloads the
+sources listed in `assets-hd.json`, cuts the pose sheet into frames, scales
+them to a common pixel size, snaps the palette and packs
+`src/renderer/assets/hd/luna.png`; it also analyses the picture to find the
+stars, lanterns, windows and the moon so the renderer can twinkle, flicker
+and orbit them.
+
+```bat
+npm run assets:hd:preview   # docs/hd/ previews of every candidate
+npm run assets:hd           # rebuild src/renderer/assets/hd/ from assets-hd.json
+```
+
+The same thing runs in GitHub Actions (`.github/workflows/hd-assets.yml`,
+"HD assets" → *build*) which commits the results to the branch. Tray menu:
+**Luna** (HD sprite / classic), **Background** (HD picture / classic
+procedural), **Picture detail** (full resolution / snapped to the pixel grid).
 
 ## Building it on Windows
 
@@ -85,4 +111,6 @@ Pokémon roster and personalities are the `SPECIES` table in the same file.
   hosted there as well. Pokémon is © Nintendo / Creatures Inc. / GAME FREAK —
   this is a personal, non-commercial fan project, please don't redistribute
   the sprites commercially.
-- Everything else (Luna, the background, icons) is original and MIT licensed.
+- The HD background and Luna sprite sheet were generated with Higgsfield
+  (GPT Image 2.5) for this project; the hand-drawn Luna, the procedural
+  background and the icons are original. Everything that is ours is MIT licensed.
