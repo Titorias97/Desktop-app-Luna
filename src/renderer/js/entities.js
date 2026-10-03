@@ -97,8 +97,8 @@
   // ---------------------------------------------------------------------------
   class Girl extends Entity {
     constructor(world, img, meta) {
-      const sheet = new Sheet(img, meta.w, meta.h, meta.frames ? Object.keys(meta.frames).length : 1);
-      super(world, 'luna', sheet, new Animator([0], [1000]), { baseFacing: 1, facing: 1, speed: 30 });
+      const sheet = new Sheet(img, meta.w, meta.h, meta.cols || (meta.frames ? Object.keys(meta.frames).length : 1));
+      super(world, 'luna', sheet, new Animator([0], [1000]), { baseFacing: meta.baseFacing || 1, facing: 1, speed: 30, bobAmp: meta.bob ? meta.bob[0] : 0, bobPeriod: meta.bob ? meta.bob[1] : 3 });
       this.meta = meta;
       this.state = 'idle';
       this.play('idle');

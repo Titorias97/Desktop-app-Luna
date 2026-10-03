@@ -9,13 +9,18 @@ html, body {
   user-select: none;
   -webkit-user-select: none;
 }
-#scene {
+#scene, #bg {
   position: absolute;
   top: 0;
   left: 0;
+  display: block;
+}
+#scene {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  display: block;
+}
+#bg {
+  display: none;
 }
 #error {
   display: none;

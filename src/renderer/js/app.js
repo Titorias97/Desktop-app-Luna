@@ -16,10 +16,14 @@
     fps: Number(params.get('fps')) || 30,
     debug: params.get('debug') === '1',
     seed: Number(params.get('seed')) || 0,
+    luna: params.get('luna') || 'hd',     // 'hd' (Higgsfield sprite) | 'classic' (hand-drawn)
+    bg: params.get('bg') || 'hd',         // 'hd' (Higgsfield picture) | 'classic' (procedural)
+    detail: params.get('detail') || 'hd', // 'hd' (full-resolution picture) | 'pixel' (snapped to the sprite grid)
   };
 
   const canvas = document.getElementById('scene');
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const bgCanvas = document.getElementById('bg');
+  const ctx = canvas.getContext('2d', { alpha: true });
   let world = null;
   let paused = false;
   let assets = null;
@@ -38,12 +42,16 @@
     const pokemonMeta = window.LUNA_POKEMON;
     const girlMeta = window.LUNA_GIRL;
     if (!pokemonMeta || !girlMeta) throw new Error('asset manifests missing — run `npm run assets`');
+    const hdBg = window.LUNA_HD_BG && window.LUNA_HD_BG.available ? window.LUNA_HD_BG : null;
+    const hdGirl = window.LUNA_GIRL_HD && window.LUNA_GIRL_HD.available ? window.LUNA_GIRL_HD : null;
     const images = {};
     await Promise.all([
       ...POKEMON_ORDER.map(async (id) => { images[id] = await loadImage(`assets/${pokemonMeta[id].file}`); }),
       (async () => { images.girl = await loadImage(`assets/${girlMeta.file}`); })(),
+      (async () => { if (hdBg) images.hdBg = await loadImage(`assets/${hdBg.file}`).catch(() => null); })(),
+      (async () => { if (hdGirl) images.hdGirl = await loadImage(`assets/${hdGirl.file}`).catch(() => null); })(),
     ]);
-    return { pokemonMeta, girlMeta, images };
+    return { pokemonMeta, girlMeta, hdBg: images.hdBg ? hdBg : null, hdGirl: images.hdGirl ? hdGirl : null, images };
   }
 
   // ---------------------------------------------------------------------------
@@ -63,29 +71,46 @@
     canvas.style.width = `${W * cssScale}px`;
     canvas.style.height = `${H * cssScale}px`;
     ctx.imageSmoothingEnabled = false;
+    const useHdBg = settings.bg === 'hd' && assets.hdBg;
+    // The full-resolution picture lives on its own canvas behind the pixel scene.
+    bgCanvas.style.display = useHdBg ? 'block' : 'none';
+    if (useHdBg) {
+      bgCanvas.width = Math.round(W * physScale);
+      bgCanvas.height = Math.round(H * physScale);
+      bgCanvas.style.width = `${W * cssScale}px`;
+      bgCanvas.style.height = `${H * cssScale}px`;
+    }
 
     const scale = cssScale; // CSS px per logical pixel (pointer conversion)
     const inset = Math.ceil(settings.bottomInset / physScale);
-    const layout = {
-      horizon: Math.round(H * 0.56),
-      groundTop: Math.round(H * 0.7),
-      groundBottom: Math.max(Math.round(H * 0.7) + 30, H - inset - 4),
-    };
     const seed = settings.seed || 20241031;
     const rng = makeRng(seed ^ 0x9e3779b9);
     const w = {
-      W, H, scale, physScale, layout, rng, settings,
-      zone: { x0: 18, x1: W - 18, y0: layout.groundTop + 8, y1: layout.groundBottom },
+      W, H, scale, physScale, rng, settings,
       time: 0,
       pointer: { x: -1, y: -1, present: false },
       steppers: new Set(),
       entities: [],
       pokemon: {},
     };
-    w.bg = new Luna.Background(W, H, layout, seed);
+    if (useHdBg) {
+      w.bg = new Luna.ImageBackground(assets.images.hdBg, assets.hdBg, W, H, { detail: settings.detail, bgCanvas, inset });
+      w.layout = w.bg.layout;
+    } else {
+      w.layout = {
+        horizon: Math.round(H * 0.56),
+        groundTop: Math.round(H * 0.7),
+        groundBottom: Math.max(Math.round(H * 0.7) + 30, H - inset - 4),
+      };
+      w.bg = new Luna.Background(W, H, w.layout, seed);
+    }
+    const layout = w.layout;
+    w.zone = { x0: 18, x1: W - 18, y0: layout.groundTop + 8, y1: layout.groundBottom };
+    w.opaqueScene = !useHdBg;
     w.particles = new Particles(w);
     w.bubbles = new Bubbles(w);
-    w.girl = new Girl(w, assets.images.girl, assets.girlMeta);
+    const useHdGirl = settings.luna === 'hd' && assets.hdGirl;
+    w.girl = useHdGirl ? new Girl(w, assets.images.hdGirl, assets.hdGirl) : new Girl(w, assets.images.girl, assets.girlMeta);
     w.girl.x = Math.round(W * 0.5);
     w.girl.y = Math.round((w.zone.y0 + w.zone.y1) / 2);
     w.entities.push(w.girl);
@@ -184,6 +209,7 @@
     if (s.scale !== undefined && s.scale !== settings.scale) { settings.scale = s.scale; rebuild = true; }
     if (s.bottomInset !== undefined && s.bottomInset !== settings.bottomInset) { settings.bottomInset = s.bottomInset; rebuild = true; }
     if (s.interactive !== undefined) settings.interactive = s.interactive;
+    for (const k of ['luna', 'bg', 'detail']) if (s[k] !== undefined && s[k] !== settings[k]) { settings[k] = s[k]; rebuild = true; }
     if (s.fps !== undefined && s.fps) settings.fps = s.fps;
     if (rebuild && assets) world = buildWorld();
   }
@@ -203,6 +229,7 @@
   }
 
   function render(w) {
+    if (w.opaqueScene) { ctx.fillStyle = '#06040d'; ctx.fillRect(0, 0, w.W, w.H); }
     w.bg.drawBack(ctx);
     const air = w.entities.filter((e) => e.airborne);
     for (const e of air) e.draw(ctx);
@@ -259,6 +286,6 @@
     }
   }
 
-  Luna.app = { get world() { return world; }, settings, fastForward, handleClick, setPointer, applySettings };
+  Luna.app = { get world() { return world; }, get assets() { return assets; }, settings, fastForward, handleClick, setPointer, applySettings };
   boot();
 })(window.Luna);

@@ -24,13 +24,14 @@
   }
 
   class Background {
-    constructor(W, H, layout, seed = 20241031) {
+    constructor(W, H, layout, seed = 20241031, opts = {}) {
       this.W = W;
       this.H = H;
       this.layout = layout;
       this.rng = Luna.util.makeRng(seed);
       this.time = 0;
       this.props = [];
+      this.liveOnly = Boolean(opts.liveOnly);
       this.build();
     }
 
@@ -38,15 +39,19 @@
     build() {
       const { W, H, rng } = this;
       const { horizon, groundTop } = this.layout;
-      this.sky = makeCanvas(W, H);
-      this.ground = makeCanvas(W, H);
-      this.buildSky();
-      this.buildMoon();
-      this.buildFarSilhouette();
-      this.buildGround();
-      this.buildFence();
+      this.windows = [];
+      this.lanterns = [];
       this.buildFog();
-      this.buildProps();
+      if (!this.liveOnly) {
+        this.sky = makeCanvas(W, H);
+        this.ground = makeCanvas(W, H);
+        this.buildSky();
+        this.buildMoon();
+        this.buildFarSilhouette();
+        this.buildGround();
+        this.buildFence();
+        this.buildProps();
+      }
 
       // Stars
       this.stars = [];
@@ -537,7 +542,7 @@
         if (c.speed < 0 && c.x < -c.canvas.width) c.x = W;
       }
       // Windows change now and then (someone walks past a candle...)
-      if (chance(rng, dt * 0.08)) {
+      if (this.windows.length && chance(rng, dt * 0.08)) {
         const w = pick(rng, this.windows);
         if (!w.door) w.lit = !w.lit;
       }
@@ -582,18 +587,7 @@
         else ctx.fillRect(s.x, s.y, 1, 1);
       }
       ctx.globalAlpha = 1;
-      if (this.shooting) {
-        const s = this.shooting;
-        const k = s.t / s.life;
-        const x = s.x + s.vx * s.t;
-        const y = s.y + s.vy * s.t;
-        ctx.globalAlpha = 1 - k;
-        for (let i = 0; i < 10; i++) {
-          ctx.fillStyle = i < 2 ? '#ffffff' : '#c9c3ff';
-          ctx.fillRect(Math.round(x - (s.vx / 50) * i), Math.round(y - (s.vy / 50) * i), 1, 1);
-        }
-        ctx.globalAlpha = 1;
-      }
+      this.drawShooting(ctx);
       // Moon with glow
       const m = this.moon;
       drawGlow(ctx, m.x, m.y, m.r * 3, '#b7a6ff', 0.07 + m.lit * 0.12);
@@ -604,11 +598,7 @@
         ctx.drawImage(c.canvas, Math.round(c.x), c.y);
       }
       ctx.globalAlpha = 1;
-      // Bats
-      for (const b of this.bats) {
-        const flap = Math.floor((t * 9 + b.phase) % 2) === 0;
-        drawIcon(ctx, flap ? 'batA' : 'batB', b.x, b.y + Math.sin(t * 3 + b.phase) * b.amp);
-      }
+      this.drawBats(ctx);
       // Lit windows
       for (const w of this.windows) {
         if (!w.lit) continue;
@@ -629,7 +619,33 @@
         const f = 0.8 + 0.2 * Math.sin(t * 6 + l.seed) * Math.sin(t * 2.3 + l.seed);
         drawGlow(ctx, l.x, l.y, l.big ? 34 : l.small ? 9 : 18, '#ffb860', (l.small ? 0.22 : 0.3) * f);
       }
-      // Will-o'-wisps
+      this.drawWisps(ctx);
+    }
+
+    drawShooting(ctx) {
+      if (!this.shooting) return;
+      const s = this.shooting;
+      const k = s.t / s.life;
+      const x = s.x + s.vx * s.t;
+      const y = s.y + s.vy * s.t;
+      ctx.globalAlpha = 1 - k;
+      for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = i < 2 ? '#ffffff' : '#c9c3ff';
+        ctx.fillRect(Math.round(x - (s.vx / 50) * i), Math.round(y - (s.vy / 50) * i), 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    drawBats(ctx) {
+      const t = this.time;
+      for (const b of this.bats) {
+        const flap = Math.floor((t * 9 + b.phase) % 2) === 0;
+        drawIcon(ctx, flap ? 'batA' : 'batB', b.x, b.y + Math.sin(t * 3 + b.phase) * b.amp);
+      }
+    }
+
+    drawWisps(ctx) {
+      const t = this.time;
       for (const w of this.wisps) {
         const x = w.x + Math.sin(t * 0.4 + w.seed) * 24 + Math.sin(t * 1.3 + w.seed * 2) * 6;
         const y = w.y + Math.sin(t * 0.7 + w.seed * 3) * 10;
