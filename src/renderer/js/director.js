@@ -66,6 +66,7 @@
         ['altariaLanding', 1.6, () => since('altariaLanding') > 120 && w.pokemon['altaria-mega'].mode === 'fly'],
         ['froslassWaltz', 1.5, () => since('froslassWaltz') > 110],
         ['piplupParade', 1.5, () => since('piplupParade') > 80],
+        ['piplupKick', 1.4, () => since('piplupKick') > 100],
         ['lunatoneVisit', 1.3, () => since('lunatoneVisit') > 140],
         ['chandelureLight', 1.2, () => since('chandelureLight') > 90],
         ['nap', hour >= 1 && hour < 6 ? 6 : 0.3, () => since('nap') > 240],
@@ -326,6 +327,69 @@
       for (let i = 0; i < 7; i++) { p.hop(70); if (i === 3) { girl.pose('happy'); w.particles.burst('note', p.centerX, p.topY, 2); } yield 0.9; }
       w.steppers.delete(step);
       w.bubbles.show(p, 'heart', 1.4);
+      yield 1.2;
+      girl.stop();
+    },
+
+    /** Luna punts Piplup across the garden; it tumbles into the wall, sees stars, and waddles back. */
+    *piplupKick(w) {
+      const p = w.pokemon.piplup;
+      const girl = w.girl;
+      p.busy = true; p.wanderTarget = null;
+      // Walk up behind it.
+      const side = girl.x < p.x ? -1 : 1;
+      yield* walkGirlTo(w, clamp(p.x + side * (p.w / 2 + 10), w.zone.x0, w.zone.x1), clamp(p.y + 1, w.zone.y0, w.zone.y1), 12);
+      girl.busy = true;
+      girl.faceToward(p.x);
+      p.faceToward(girl.x);
+      // Wind-up ... (with a few choice words)
+      girl.pose('pet');
+      w.bubbles.show(girl, { text: 'Putita' }, 1.6);
+      yield 0.55;
+      // ... KICK.
+      const dir = girl.facing;
+      girl.pose('reach');
+      girl.hop(70);
+      w.particles.spawn('bang', p.centerX, p.topY - 2, { life: 0.7 });
+      w.bubbles.show(p, 'bang', 0.9);
+      p.hop(150);
+      let vx = dir * 210;
+      let hits = 0;
+      let rolling = true;
+      const step = (dt) => {
+        if (!rolling) return;
+        p.x += vx * dt;
+        p.roll += (vx / 11) * dt;
+        p.facing = dir;
+        const wallL = w.zone.x0 + p.w / 2, wallR = w.zone.x1 - p.w / 2;
+        if (p.x <= wallL || p.x >= wallR) {
+          // Thud against the wall: bounce back, slower.
+          p.x = clamp(p.x, wallL, wallR);
+          vx = -vx * 0.45;
+          hits++;
+          p.hop(60);
+          w.particles.spawn('bang', p.centerX + (p.x <= wallL + 1 ? -6 : 6), p.topY, { life: 0.5 });
+          w.particles.burst('dust', p.centerX, p.y, 4);
+        }
+        if (p.z <= 0.01) vx *= Math.max(0, 1 - 1.1 * dt); // ground friction
+        if (Math.abs(vx) < 12 && p.z <= 0.01) { rolling = false; vx = 0; }
+      };
+      w.steppers.add(step);
+      yield until(() => !rolling, 6);
+      w.steppers.delete(step);
+      rolling = false;
+      // Lands on its feet eventually.
+      p.roll = 0;
+      girl.pose('happy');
+      // Dizzy: stars circle its head.
+      for (let i = 0; i < 4; i++) { w.particles.spawn('sparkleSmall', p.centerX + Math.cos(i * 1.6) * 8, p.topY - 2, { life: 0.8, vy: -4 }); yield 0.45; }
+      // Luna feels a little bad (or does she?), waves it back over.
+      girl.pose('wave');
+      yield 0.8;
+      yield* moveTo(w, p, girl.x - dir * (p.w / 2 + 12), girl.y + 2, 10, 2.4);
+      p.faceToward(girl.x);
+      p.hop(50);
+      w.bubbles.show(p, 'heart', 1.2);
       yield 1.2;
       girl.stop();
     },

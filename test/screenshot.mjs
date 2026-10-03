@@ -45,11 +45,11 @@ for (const [width, height] of sizes) {
   await shot('03-click-piplup');
 
   // Every scripted scene, fast-forwarded.
-  const scenes = ['gengarPrank', 'mamoswineRide', 'drifblimRide', 'altariaLanding', 'froslassWaltz', 'piplupParade', 'lunatoneVisit', 'chandelureLight', 'benchRest', 'nap', 'userWave'];
+  const scenes = ['gengarPrank', 'mamoswineRide', 'drifblimRide', 'altariaLanding', 'froslassWaltz', 'piplupParade', 'piplupKick', 'lunatoneVisit', 'chandelureLight', 'benchRest', 'nap', 'userWave'];
   let n = 10;
   for (const name of scenes) {
     await page.evaluate((nm) => { const w = window.Luna.app.world; w.director.start(nm, window.Luna.SCENES[nm](w)); }, name);
-    const mid = { gengarPrank: 2.2, mamoswineRide: 9, drifblimRide: 6, altariaLanding: 9, froslassWaltz: 7, piplupParade: 5, lunatoneVisit: 7, chandelureLight: 6, benchRest: 7, nap: 9, userWave: 0.6 }[name];
+    const mid = { gengarPrank: 2.2, mamoswineRide: 9, drifblimRide: 6, altariaLanding: 9, froslassWaltz: 7, piplupParade: 5, piplupKick: 2.2, lunatoneVisit: 7, chandelureLight: 6, benchRest: 7, nap: 9, userWave: 0.6 }[name];
     await ff(mid);
     await shot(`${n++}-scene-${name}`);
     await ff(30); // let the scene finish and release everyone

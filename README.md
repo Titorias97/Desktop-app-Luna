@@ -66,9 +66,17 @@ npm run dist         # build release\Luna Setup 0.1.0.exe and the portable .exe
 The sprites are already in the repo; `npm run assets` regenerates them
 (downloads the Pokémon sprites and rebuilds the girl's sheet and icons).
 
-Settings live in the tray menu (right-click the moon icon): pause, cursor
-reactions on/off, pixel size, frame rate, space for the taskbar, which
-displays to cover, launch at login. *Quit* restores your previous wallpaper.
+Settings live in the tray menu (right-click the moon icon — Windows 11 hides
+new tray icons under the `^` overflow button): pause, cursor reactions on/off,
+resolution (automatic, or a 1080p / 1440p / 4K pixel-scale preset), frame
+rate, space for the taskbar, which displays to cover, launch at login. *Quit*
+restores your previous wallpaper.
+
+While Luna runs, the Windows wallpaper is switched to a solid dark picture
+(`%APPDATA%\Luna\luna-dark-wallpaper.png`): the translucent taskbar blurs the
+static wallpaper, not the live scene, so without this it would show your old
+picture. The original path is saved next to it and put back on quit, or on
+the next start if a previous run was killed.
 
 ### Use it without Electron
 
