@@ -105,6 +105,27 @@
     const side = w.girl.x < mon.x ? -1 : 1;
     const spot = spotNear(w, mon, side);
     yield* walkGirlTo(w, spot.x, spot.y);
+    yield* petHere(w, mon, seconds);
+  }
+
+  /** Luna and the Pokémon walk toward each other and meet halfway, then she pets it. */
+  function* meetAndPet(w, mon, seconds = 2.2) {
+    const girl = w.girl;
+    mon.busy = true;
+    mon.wanderTarget = null;
+    const side = girl.x < mon.x ? -1 : 1; // which side of the Pokémon Luna is on
+    const gap = mon.w / 2 + 12;
+    const midX = (girl.x + mon.x) / 2;
+    const midY = clamp((girl.y + mon.y) / 2, w.zone.y0, w.zone.y1);
+    girl.goTo(clamp(midX + side * (gap / 2), w.zone.x0, w.zone.x1), midY);
+    yield* moveTo(w, mon, clamp(midX - side * (gap / 2), w.zone.x0, w.zone.x1), clamp(midY + 2, w.zone.y0, w.zone.y1), 20, mon.cfg.lazy ? 1.8 : 1.5);
+    yield until(() => girl.arrived, 20);
+    if (!girl.arrived) girl.stop();
+    yield* petHere(w, mon, seconds);
+  }
+
+  /** The petting itself, once Luna stands next to the Pokémon. */
+  function* petHere(w, mon, seconds) {
     w.girl.faceToward(mon.x);
     mon.faceToward(w.girl.x);
     w.girl.pose('pet');
@@ -434,6 +455,7 @@
 
     // -- user triggered ------------------------------------------------------
     *userVisit(w, mon) { yield* petPokemon(w, mon, 2); },
+    *userMeet(w, mon) { yield* meetAndPet(w, mon, 2.2); },
     *userWave(w) {
       const girl = w.girl;
       girl.busy = true;
