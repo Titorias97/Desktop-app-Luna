@@ -31,6 +31,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p docs/hd src/renderer/assets/hd
           git add -A docs/hd src/renderer/assets/hd
           git diff --cached --quiet || git commit -m "HD assets: ${{ inputs.mode }} (Higgsfield)"
           git push
