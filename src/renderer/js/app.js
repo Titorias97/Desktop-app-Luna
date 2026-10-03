@@ -146,9 +146,11 @@
     const g = w.girl;
     g.busy = false;
     g.hover = 0;
+    g.roll = 0; // a cancelled scene must not leave her leaning
     if (!g.walkTarget) g.stop();
     for (const m of Object.values(w.pokemon)) {
       m.busy = false;
+      m.roll = 0;
       m.hover = m.cfg.hover;
       if (m.cfg.alpha) m.alpha = m.cfg.alpha;
       if (m.cfg.kind === 'flyer') { m.airborne = true; m.shadow = false; m.mode = 'fly'; m.wanderTarget = null; }

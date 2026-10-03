@@ -31,7 +31,8 @@
       this.shadow = opts.shadow !== false;
       this.sortBias = 0;
       this.spin = 0;
-      this.roll = 0; // rotation in radians (tumbling)
+      this.roll = 0; // rotation in radians (tumbling / leaning)
+      this.rollPivot = 'center'; // 'center' (tumbling) or 'feet' (leaning)
       this.time = 0;
     }
     get w() { return this.sheet.w; }
@@ -92,10 +93,11 @@
     }
     draw(ctx) {
       if (this.roll) {
+        const feet = this.rollPivot === 'feet';
         ctx.save();
-        ctx.translate(Math.round(this.drawX), Math.round(this.drawY - this.h / 2));
+        ctx.translate(Math.round(this.drawX), Math.round(feet ? this.drawY : this.drawY - this.h / 2));
         ctx.rotate(this.roll);
-        this.sheet.draw(ctx, this.anim.frame, 0, this.h / 2, this.flip, this.alpha);
+        this.sheet.draw(ctx, this.anim.frame, 0, feet ? 0 : this.h / 2, this.flip, this.alpha);
         ctx.restore();
         return;
       }
@@ -142,6 +144,14 @@
       this.walkTarget = null;
       this.state = name;
       this.play(name);
+    }
+    /** Freezes a single sheet frame (e.g. a stride from the walk cycle) as a pose. */
+    poseFrame(frameName, state = frameName) {
+      this.walkTarget = null;
+      this.state = state;
+      this.current = state;
+      const f = this.meta.frames[frameName];
+      if (f !== undefined) this.anim.set([f], [1000], false);
     }
     update(dt) {
       this.updatePhysics(dt);

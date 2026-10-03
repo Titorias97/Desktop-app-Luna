@@ -363,17 +363,28 @@
       girl.busy = true;
       girl.faceToward(p.x);
       p.faceToward(girl.x);
-      // Wind-up ... (with a few choice words)
-      girl.pose('pet');
-      w.bubbles.show(girl, { text: 'Putita' }, 1.6);
-      yield 0.55;
-      // ... KICK.
       const dir = girl.facing;
-      girl.pose('reach');
-      girl.hop(70);
+      // Wind-up: she leans way back on one leg (with a few choice words)...
+      girl.rollPivot = 'feet';
+      girl.poseFrame('walk1', 'kick');
+      w.bubbles.show(girl, { text: 'Putita' }, 1.6);
+      {
+        let t = 0;
+        const lean = (dt) => { t += dt; girl.roll = -dir * Math.min(0.55, t * 1.1); };
+        w.steppers.add(lean);
+        yield 0.5;
+        w.steppers.delete(lean);
+      }
+      // ... and whips forward: big lean into the kick, lunge, swoosh.
+      girl.roll = dir * 0.7;
+      girl.x = clamp(girl.x + dir * 10, w.zone.x0, w.zone.x1);
+      girl.poseFrame('walk2', 'kick');
+      w.particles.burst('dust', girl.x - dir * 8, girl.y, 4);
       w.particles.spawn('bang', p.centerX, p.topY - 2, { life: 0.7 });
+      w.particles.spawn('bang', p.centerX + dir * 10, p.centerY, { life: 0.5, vy: -30 });
       w.bubbles.show(p, 'bang', 0.9);
-      p.hop(150);
+      p.x = clamp(p.x + dir * 16, w.zone.x0, w.zone.x1); // knocked clear of her foot at once
+      p.hop(190);
       let vx = dir * 210;
       let hits = 0;
       let rolling = true;
@@ -396,6 +407,17 @@
         if (Math.abs(vx) < 12 && p.z <= 0.01) { rolling = false; vx = 0; }
       };
       w.steppers.add(step);
+      // Follow-through: hold the kick, then straighten up.
+      yield 0.35;
+      {
+        let t = 0;
+        const unlean = (dt) => { t += dt; girl.roll = dir * Math.max(0, 0.7 - t * 2.5); };
+        w.steppers.add(unlean);
+        yield 0.3;
+        w.steppers.delete(unlean);
+      }
+      girl.roll = 0;
+      girl.pose('happy');
       yield until(() => !rolling, 6);
       w.steppers.delete(step);
       rolling = false;
