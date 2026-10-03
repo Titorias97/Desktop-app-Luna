@@ -59,7 +59,7 @@
   "chosen": {
     "background": "gpt-a",
     "luna": "gpt",
-    "sheet": null,
+    "sheet": "gpt-sheet-b",
     "targetHeight": 84,
     "colors": 64,
     "layout": {

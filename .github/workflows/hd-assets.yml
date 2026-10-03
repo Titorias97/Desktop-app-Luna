@@ -27,11 +27,20 @@ jobs:
           node-version: 22
       - run: npm ci --ignore-scripts
       - run: node scripts/hd-assets.js ${{ inputs.mode }}
+      - name: Screenshot the HD scene
+        if: inputs.mode == 'build'
+        continue-on-error: true
+        run: |
+          npx playwright install --with-deps chromium
+          node test/screenshot.mjs
+          cp test/output/1920x1080-01-idle.png docs/preview-hd.png
+          cp test/output/1920x1080-03-click-piplup.png docs/hd/preview-click.png
+          cp test/output/1920x1080-11-scene-mamoswineRide.png docs/hd/preview-ride.png
       - name: Commit results
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mkdir -p docs/hd src/renderer/assets/hd
-          git add -A docs/hd src/renderer/assets/hd
+          git add -A docs/hd src/renderer/assets/hd docs/preview-hd.png docs/luna-hd.png
           git diff --cached --quiet || git commit -m "HD assets: ${{ inputs.mode }} (Higgsfield)"
           git push

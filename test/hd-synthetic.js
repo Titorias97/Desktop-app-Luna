@@ -43,7 +43,14 @@ const out = path.join(ROOT, 'src/renderer/assets/hd');
 const backup = {};
 for (const f of ['bg.js', 'luna.js', 'bg.png', 'luna.png', 'luna.json']) { const p = path.join(out, f); if (fs.existsSync(p)) backup[f] = fs.readFileSync(p); }
 try {
-  const log = execFileSync('node', [path.join(ROOT, 'scripts/hd-assets.js'), 'build'], { env: { ...process.env, LUNA_HD_CONFIG: path.join(tmp, 'config.json'), LUNA_HD_CACHE: path.join(tmp, 'cache') }, encoding: 'utf8' });
+  let log;
+  try {
+    log = execFileSync('node', [path.join(ROOT, 'scripts/hd-assets.js'), 'build'], { env: { ...process.env, LUNA_HD_CONFIG: path.join(tmp, 'config.json'), LUNA_HD_CACHE: path.join(tmp, 'cache') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (err) {
+    process.stdout.write(String(err.stdout || ''));
+    process.stderr.write(String(err.stderr || '').split('\n').filter((l) => !l.trim().startsWith('at ')).join('\n'));
+    throw new Error('hd build failed');
+  }
   process.stdout.write(log);
   const manifest = JSON.parse(fs.readFileSync(path.join(out, 'luna.json'), 'utf8'));
   if (Object.keys(manifest.frames).length !== 12) throw new Error('expected 12 frames');

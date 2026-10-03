@@ -68,9 +68,13 @@ module.exports = async function build(t) {
   const sheetFile = await download(sheetSrc.url, `sheet-${sheetSrc.id}.png`);
   const sheet = readPng(sheetFile);
   if (sheetSrc.chroma) chromaKey(sheet, sheetSrc.chroma, 120);
-  const blobs = segment(sheet, chosen.minBlobArea || 400, chosen.mergeGap || 10);
-  console.log(`sheet ${sheetSrc.id}: ${sheet.width}x${sheet.height}, ${blobs.length} figures found`);
-  const cells = assignCells(blobs, sheet.width, sheet.height, 4, 3);
+  let cells = gridCells(sheet, 4, 3);
+  if (!cells) {
+    const blobs = segment(sheet, chosen.minBlobArea || 400, chosen.mergeGap || 10);
+    console.log(`sheet ${sheetSrc.id}: band detection failed, ${blobs.length} blobs found`);
+    cells = assignCells(blobs, sheet.width, sheet.height, 4, 3);
+  }
+  console.log(`sheet ${sheetSrc.id}: ${sheet.width}x${sheet.height}, cells: ${cells.map((c) => (c ? `${c.w}x${c.h}` : '-')).join(' ')}`);
   const idle = cells[0];
   if (!idle) throw new Error('no idle pose found in cell 1');
   const factor = idle.h / (chosen.targetHeight || 84);
@@ -116,6 +120,67 @@ module.exports = async function build(t) {
 };
 
 // -----------------------------------------------------------------------------
+/**
+ * Splits a cols x rows pose sheet into cells using occupancy profiles: column
+ * bands over the whole sheet, then row bands inside each column. Returns an
+ * array of bounding boxes (row-major) or null when the bands cannot be found.
+ */
+function gridCells(png, cols, rows) {
+  const { width: w, height: h } = png;
+  const opaque = (x, y) => png.data[(y * w + x) * 4 + 3] > 40;
+  const bands = (len, occupied, minGap, expected) => {
+    // occupied(i) -> bool; returns [start,end] runs, merging runs separated by gaps < minGap
+    const runs = [];
+    let start = -1;
+    for (let i = 0; i <= len; i++) {
+      const on = i < len && occupied(i);
+      if (on && start < 0) start = i;
+      if (!on && start >= 0) { runs.push([start, i - 1]); start = -1; }
+    }
+    const merged = [];
+    for (const r of runs) {
+      const last = merged[merged.length - 1];
+      if (last && r[0] - last[1] - 1 < minGap) last[1] = r[1]; else merged.push([...r]);
+    }
+    // drop slivers (noise) then, while too many, merge the smallest band into its nearest neighbour
+    let out = merged.filter((r) => r[1] - r[0] + 1 >= len * 0.02);
+    while (out.length > expected) {
+      let si = 0;
+      for (let i = 1; i < out.length; i++) if (out[i][1] - out[i][0] < out[si][1] - out[si][0]) si = i;
+      const prev = out[si - 1], next = out[si + 1];
+      const toPrev = prev ? out[si][0] - prev[1] : Infinity;
+      const toNext = next ? next[0] - out[si][1] : Infinity;
+      if (toPrev <= toNext) { prev[1] = out[si][1]; out.splice(si, 1); } else { next[0] = out[si][0]; out.splice(si, 1); }
+    }
+    if (out.length && out.length !== expected) {
+      // poses touch or have uneven gaps: split the overall extent evenly
+      const a = out[0][0], b = out[out.length - 1][1];
+      const size = (b - a + 1) / expected;
+      out = Array.from({ length: expected }, (_, i) => [Math.round(a + i * size), Math.round(a + (i + 1) * size) - 1]);
+    }
+    return out.length === expected ? out : null;
+  };
+  const colCount = new Int32Array(w);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (opaque(x, y)) colCount[x]++;
+  const colBands = bands(w, (x) => colCount[x] > 2, Math.round(w * 0.01), cols);
+  if (!colBands) return null;
+  const cells = new Array(cols * rows).fill(null);
+  for (let c = 0; c < cols; c++) {
+    const [x0, x1] = colBands[c];
+    const rowCount = new Int32Array(h);
+    for (let y = 0; y < h; y++) for (let x = x0; x <= x1; x++) if (opaque(x, y)) rowCount[y]++;
+    const rowBands = bands(h, (y) => rowCount[y] > 2, Math.round(h * 0.01), rows);
+    if (!rowBands) return null;
+    for (let r = 0; r < rows; r++) {
+      const [y0, y1] = rowBands[r];
+      let bx0 = x1, bx1 = x0;
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (opaque(x, y)) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; }
+      cells[r * cols + c] = { x: bx0, y: y0, w: bx1 - bx0 + 1, h: y1 - y0 + 1 };
+    }
+  }
+  return cells;
+}
+
 function snapAlpha(png, threshold) {
   for (let i = 3; i < png.data.length; i += 4) png.data[i] = png.data[i] >= threshold ? 255 : 0;
 }
