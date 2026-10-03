@@ -1,0 +1,120 @@
+{
+  "available": true,
+  "file": "hd/luna.png",
+  "w": 51,
+  "h": 85,
+  "cols": 4,
+  "anchor": {
+    "x": 25.5,
+    "y": 85
+  },
+  "baseFacing": 1,
+  "bob": [
+    1,
+    3.4
+  ],
+  "frames": {
+    "idle0": 0,
+    "walk0": 1,
+    "walk1": 2,
+    "walk2": 3,
+    "pet0": 4,
+    "pet1": 5,
+    "wave0": 6,
+    "wave1": 7,
+    "sit0": 8,
+    "startle0": 9,
+    "reach0": 10,
+    "happy0": 11
+  },
+  "animations": {
+    "idle": {
+      "frames": [
+        "idle0"
+      ],
+      "ms": [
+        1000
+      ],
+      "loop": true
+    },
+    "walk": {
+      "frames": [
+        "walk0",
+        "walk1",
+        "walk2",
+        "walk1"
+      ],
+      "ms": [
+        150,
+        150,
+        150,
+        150
+      ],
+      "loop": true
+    },
+    "pet": {
+      "frames": [
+        "pet0",
+        "pet1"
+      ],
+      "ms": [
+        320,
+        320
+      ],
+      "loop": true
+    },
+    "wave": {
+      "frames": [
+        "wave0",
+        "wave1"
+      ],
+      "ms": [
+        260,
+        260
+      ],
+      "loop": true
+    },
+    "sit": {
+      "frames": [
+        "sit0"
+      ],
+      "ms": [
+        1000
+      ],
+      "loop": true
+    },
+    "startle": {
+      "frames": [
+        "startle0"
+      ],
+      "ms": [
+        600
+      ],
+      "loop": false
+    },
+    "reach": {
+      "frames": [
+        "reach0"
+      ],
+      "ms": [
+        1000
+      ],
+      "loop": true
+    },
+    "happy": {
+      "frames": [
+        "happy0",
+        "idle0"
+      ],
+      "ms": [
+        260,
+        260
+      ],
+      "loop": true
+    }
+  },
+  "source": {
+    "model": "gpt_image_2_5",
+    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_020830_b69be9ab-859e-407d-a446-c764774889a2.png"
+  }
+}
