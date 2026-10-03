@@ -31,6 +31,8 @@
       this.shadow = opts.shadow !== false;
       this.sortBias = 0;
       this.spin = 0;
+      this.roll = 0; // rotation in radians (tumbling / leaning)
+      this.rollPivot = 'center'; // 'center' (tumbling) or 'feet' (leaning)
       this.time = 0;
     }
     get w() { return this.sheet.w; }
@@ -90,6 +92,15 @@
       ctx.globalAlpha = 1;
     }
     draw(ctx) {
+      if (this.roll) {
+        const feet = this.rollPivot === 'feet';
+        ctx.save();
+        ctx.translate(Math.round(this.drawX), Math.round(feet ? this.drawY : this.drawY - this.h / 2));
+        ctx.rotate(this.roll);
+        this.sheet.draw(ctx, this.anim.frame, 0, feet ? 0 : this.h / 2, this.flip, this.alpha);
+        ctx.restore();
+        return;
+      }
       this.sheet.draw(ctx, this.anim.frame, this.drawX, this.drawY, this.flip, this.alpha);
     }
   }
@@ -134,6 +145,14 @@
       this.state = name;
       this.play(name);
     }
+    /** Freezes a single sheet frame (e.g. a stride from the walk cycle) as a pose. */
+    poseFrame(frameName, state = frameName) {
+      this.walkTarget = null;
+      this.state = state;
+      this.current = state;
+      const f = this.meta.frames[frameName];
+      if (f !== undefined) this.anim.set([f], [1000], false);
+    }
     update(dt) {
       this.updatePhysics(dt);
       if (this.walkTarget) {
@@ -172,7 +191,7 @@
     drifblim: { kind: 'floater', hover: 54, bob: [6, 5.5], speed: 10, curious: 0.6, zone: 'ground' },
     mamoswine: { kind: 'walker', hover: 0, bob: [0, 1], speed: 12, lazy: true, zone: 'ground', heavy: true },
     lunatone: { kind: 'floater', hover: 60, bob: [3, 3.0], speed: 20, orbit: true, glow: ['#ffe39a', 22, 0.12], zone: 'sky' },
-    espeon: { kind: 'walker', hover: 0, bob: [0, 1], speed: 34, follow: 'luna', followDist: 44, gem: true, zone: 'ground' },
+    espeon: { kind: 'walker', hover: 0, bob: [0, 1], speed: 34, gem: true, zone: 'ground' },
   };
 
   class Pokemon extends Entity {
@@ -392,6 +411,7 @@
 
   class Bubbles {
     constructor(world) { this.world = world; this.list = []; }
+    /** icon: an icon name, or { text: '...' } for a tiny speech line. */
     show(entity, icon, life = 1.5) {
       this.list = this.list.filter((b) => b.entity !== entity);
       this.list.push({ entity, icon, life, t: 0 });
@@ -403,9 +423,11 @@
     draw(ctx) {
       for (const b of this.list) {
         const e = b.entity;
-        const ic = Luna.sprites.icon(b.icon);
-        const w = ic.width + 6;
-        const h = ic.height + 5;
+        const text = b.icon && b.icon.text;
+        if (text) { ctx.font = '7px monospace'; ctx.textBaseline = 'top'; }
+        const ic = text ? null : Luna.sprites.icon(b.icon);
+        const w = text ? Math.ceil(ctx.measureText(text).width) + 6 : ic.width + 6;
+        const h = text ? 11 : ic.height + 5;
         const x = Math.round(e.centerX - w / 2);
         const y = Math.round(e.topY - h - 4 - (b.t < 0.15 ? (0.15 - b.t) * 20 : 0));
         ctx.fillStyle = '#1a1020';
@@ -414,7 +436,7 @@
         ctx.fillStyle = '#f6f1f9';
         ctx.fillRect(x, y, w, h);
         ctx.fillRect(x + Math.floor(w / 2) - 1, y + h, 2, 1);
-        ctx.drawImage(ic, x + 3, y + 2);
+        if (text) { ctx.fillStyle = '#1a1020'; ctx.fillText(text, x + 3, y + 2); } else ctx.drawImage(ic, x + 3, y + 2);
       }
     }
   }

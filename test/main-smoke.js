@@ -105,6 +105,10 @@ setTimeout(() => {
       // exercise every tray menu action
       const walk = (items) => { for (const it of items) { if (it.submenu) walk(it.submenu); else if (it.click) it.click({ checked: !it.checked }); } };
       walk(Tray.instance.menu.template);
+      const resolution = Tray.instance.menu.template.find((it) => it.label === 'Resolution');
+      assert(resolution && resolution.submenu, 'Resolution submenu present');
+      const resLabels = resolution.submenu.filter((it) => it.type === 'radio').map((it) => it.label);
+      for (const want of ['Automatic', '1080p (3×)', '1440p (4×)', '4K (6×)']) assert(resLabels.includes(want), `Resolution preset "${want}" (got ${resLabels.join(', ')})`);
       assert(calls.some((c) => c[0] === 'loginItem'), 'login item toggled');
       assert(calls.some((c) => c[0] === 'showItemInFolder'), 'log folder opened');
       const settingsFile = path.join(tmp, 'settings.json');

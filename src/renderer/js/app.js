@@ -146,9 +146,11 @@
     const g = w.girl;
     g.busy = false;
     g.hover = 0;
+    g.roll = 0; // a cancelled scene must not leave her leaning
     if (!g.walkTarget) g.stop();
     for (const m of Object.values(w.pokemon)) {
       m.busy = false;
+      m.roll = 0;
       m.hover = m.cfg.hover;
       if (m.cfg.alpha) m.alpha = m.cfg.alpha;
       if (m.cfg.kind === 'flyer') { m.airborne = true; m.shadow = false; m.mode = 'fly'; m.wanderTarget = null; }
@@ -162,12 +164,17 @@
     const w = world;
     // Topmost (nearest) entity under the cursor wins.
     const hits = w.entities.filter((e) => e.contains(x, y, 2)).sort((a, b) => b.sortY - a.sortY);
-    const hit = hits[0];
+    // A Pokémon standing in front of (or behind) Luna wins: she is big and easy to hit elsewhere.
+    const hit = hits.find((e) => e !== w.girl) || hits[0];
     if (hit === w.girl) {
       w.director.start('userWave', Luna.SCENES.userWave(w));
     } else if (hit) {
       hit.react('love');
-      if (!hit.airborne) w.director.start('userVisit', Luna.SCENES.userVisit(w, hit));
+      const S = Luna.SCENES;
+      if (hit === w.pokemon.piplup) w.director.start('piplupKick', S.piplupKick(w));          // poor Piplup
+      else if (hit.name === 'altaria-mega') { if (hit.mode === 'fly') w.director.start('altariaLanding', S.altariaLanding(w)); }
+      else if (hit.name === 'lunatone') { if (hit.mode === 'orbit') w.director.start('lunatoneVisit', S.lunatoneVisit(w)); }
+      else if (!hit.airborne) w.director.start('userMeet', S.userMeet(w, hit));              // both walk to meet halfway
     } else {
       // Walk there (clamped into the garden), scatter sparkles where she clicked.
       w.particles.burst('sparkleSmall', x, y, 3);

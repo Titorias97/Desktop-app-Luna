@@ -66,6 +66,7 @@
         ['altariaLanding', 1.6, () => since('altariaLanding') > 120 && w.pokemon['altaria-mega'].mode === 'fly'],
         ['froslassWaltz', 1.5, () => since('froslassWaltz') > 110],
         ['piplupParade', 1.5, () => since('piplupParade') > 80],
+        ['piplupKick', 1.4, () => since('piplupKick') > 100],
         ['lunatoneVisit', 1.3, () => since('lunatoneVisit') > 140],
         ['chandelureLight', 1.2, () => since('chandelureLight') > 90],
         ['nap', hour >= 1 && hour < 6 ? 6 : 0.3, () => since('nap') > 240],
@@ -104,6 +105,27 @@
     const side = w.girl.x < mon.x ? -1 : 1;
     const spot = spotNear(w, mon, side);
     yield* walkGirlTo(w, spot.x, spot.y);
+    yield* petHere(w, mon, seconds);
+  }
+
+  /** Luna and the Pokémon walk toward each other and meet halfway, then she pets it. */
+  function* meetAndPet(w, mon, seconds = 2.2) {
+    const girl = w.girl;
+    mon.busy = true;
+    mon.wanderTarget = null;
+    const side = girl.x < mon.x ? -1 : 1; // which side of the Pokémon Luna is on
+    const gap = mon.w / 2 + 12;
+    const midX = (girl.x + mon.x) / 2;
+    const midY = clamp((girl.y + mon.y) / 2, w.zone.y0, w.zone.y1);
+    girl.goTo(clamp(midX + side * (gap / 2), w.zone.x0, w.zone.x1), midY);
+    yield* moveTo(w, mon, clamp(midX - side * (gap / 2), w.zone.x0, w.zone.x1), clamp(midY + 2, w.zone.y0, w.zone.y1), 20, mon.cfg.lazy ? 1.8 : 1.5);
+    yield until(() => girl.arrived, 20);
+    if (!girl.arrived) girl.stop();
+    yield* petHere(w, mon, seconds);
+  }
+
+  /** The petting itself, once Luna stands next to the Pokémon. */
+  function* petHere(w, mon, seconds) {
     w.girl.faceToward(mon.x);
     mon.faceToward(w.girl.x);
     w.girl.pose('pet');
@@ -330,6 +352,91 @@
       girl.stop();
     },
 
+    /** Luna punts Piplup across the garden; it tumbles into the wall, sees stars, and waddles back. */
+    *piplupKick(w) {
+      const p = w.pokemon.piplup;
+      const girl = w.girl;
+      p.busy = true; p.wanderTarget = null;
+      // Walk up behind it.
+      const side = girl.x < p.x ? -1 : 1;
+      yield* walkGirlTo(w, clamp(p.x + side * (p.w / 2 + 10), w.zone.x0, w.zone.x1), clamp(p.y + 1, w.zone.y0, w.zone.y1), 12);
+      girl.busy = true;
+      girl.faceToward(p.x);
+      p.faceToward(girl.x);
+      const dir = girl.facing;
+      // Wind-up: she leans way back on one leg (with a few choice words)...
+      girl.rollPivot = 'feet';
+      girl.poseFrame('walk1', 'kick');
+      w.bubbles.show(girl, { text: 'Putita' }, 1.6);
+      {
+        let t = 0;
+        const lean = (dt) => { t += dt; girl.roll = -dir * Math.min(0.55, t * 1.1); };
+        w.steppers.add(lean);
+        yield 0.5;
+        w.steppers.delete(lean);
+      }
+      // ... and whips forward: big lean into the kick, lunge, swoosh.
+      girl.roll = dir * 0.7;
+      girl.x = clamp(girl.x + dir * 10, w.zone.x0, w.zone.x1);
+      girl.poseFrame('walk2', 'kick');
+      w.particles.burst('dust', girl.x - dir * 8, girl.y, 4);
+      w.particles.spawn('bang', p.centerX, p.topY - 2, { life: 0.7 });
+      w.particles.spawn('bang', p.centerX + dir * 10, p.centerY, { life: 0.5, vy: -30 });
+      w.bubbles.show(p, 'bang', 0.9);
+      p.x = clamp(p.x + dir * 16, w.zone.x0, w.zone.x1); // knocked clear of her foot at once
+      p.hop(190);
+      let vx = dir * 210;
+      let hits = 0;
+      let rolling = true;
+      const step = (dt) => {
+        if (!rolling) return;
+        p.x += vx * dt;
+        p.roll += (vx / 11) * dt;
+        p.facing = dir;
+        const wallL = w.zone.x0 + p.w / 2, wallR = w.zone.x1 - p.w / 2;
+        if (p.x <= wallL || p.x >= wallR) {
+          // Thud against the wall: bounce back, slower.
+          p.x = clamp(p.x, wallL, wallR);
+          vx = -vx * 0.45;
+          hits++;
+          p.hop(60);
+          w.particles.spawn('bang', p.centerX + (p.x <= wallL + 1 ? -6 : 6), p.topY, { life: 0.5 });
+          w.particles.burst('dust', p.centerX, p.y, 4);
+        }
+        if (p.z <= 0.01) vx *= Math.max(0, 1 - 1.1 * dt); // ground friction
+        if (Math.abs(vx) < 12 && p.z <= 0.01) { rolling = false; vx = 0; }
+      };
+      w.steppers.add(step);
+      // Follow-through: hold the kick, then straighten up.
+      yield 0.35;
+      {
+        let t = 0;
+        const unlean = (dt) => { t += dt; girl.roll = dir * Math.max(0, 0.7 - t * 2.5); };
+        w.steppers.add(unlean);
+        yield 0.3;
+        w.steppers.delete(unlean);
+      }
+      girl.roll = 0;
+      girl.pose('happy');
+      yield until(() => !rolling, 6);
+      w.steppers.delete(step);
+      rolling = false;
+      // Lands on its feet eventually.
+      p.roll = 0;
+      girl.pose('happy');
+      // Dizzy: stars circle its head.
+      for (let i = 0; i < 4; i++) { w.particles.spawn('sparkleSmall', p.centerX + Math.cos(i * 1.6) * 8, p.topY - 2, { life: 0.8, vy: -4 }); yield 0.45; }
+      // Luna feels a little bad (or does she?), waves it back over.
+      girl.pose('wave');
+      yield 0.8;
+      yield* moveTo(w, p, girl.x - dir * (p.w / 2 + 12), girl.y + 2, 10, 2.4);
+      p.faceToward(girl.x);
+      p.hop(50);
+      w.bubbles.show(p, 'heart', 1.2);
+      yield 1.2;
+      girl.stop();
+    },
+
     *lunatoneVisit(w) {
       const l = w.pokemon.lunatone;
       const girl = w.girl;
@@ -370,6 +477,7 @@
 
     // -- user triggered ------------------------------------------------------
     *userVisit(w, mon) { yield* petPokemon(w, mon, 2); },
+    *userMeet(w, mon) { yield* meetAndPet(w, mon, 2.2); },
     *userWave(w) {
       const girl = w.girl;
       girl.busy = true;

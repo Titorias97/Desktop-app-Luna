@@ -47,6 +47,7 @@ function load() {
       SystemParametersInfoW: f('bool __stdcall SystemParametersInfoW(uint32_t action, uint32_t param, void* pv, uint32_t winini)'),
       IsWindow: f('bool __stdcall IsWindow(uintptr_t hwnd)'),
       IsZoomed: f('bool __stdcall IsZoomed(uintptr_t hwnd)'),
+      GetLastError: koffi.load('kernel32.dll').func('uint32_t __stdcall GetLastError()'),
     };
     void POINT; void RECT; void EnumWindowsProc;
     return api;
@@ -71,32 +72,38 @@ function findWallpaperHost() {
   if (!a) return null;
   const progman = num(a.FindWindowW('Progman', null));
   if (!progman) return null;
-  // Ask Progman to create the WorkerW behind the desktop icons. Both forms are
-  // sent because different Windows builds expect different lParam values.
-  const out = [0];
-  a.SendMessageTimeoutW(progman, 0x052c, 0xd, 0x1, 0, 1000, out);
-  a.SendMessageTimeoutW(progman, 0x052c, 0xd, 0x0, 0, 1000, out);
-
-  let host = 0;
   // Windows 11 24H2 and later: the icons' SHELLDLL_DefView lives inside Progman
   // and the wallpaper WorkerW is a child of Progman as well.
   const defViewInProgman = num(a.FindWindowExW(progman, 0, 'SHELLDLL_DefView', null));
-  if (defViewInProgman) {
-    host = num(a.FindWindowExW(progman, 0, 'WorkerW', null));
-    if (!host) host = progman;
-  } else {
+  const locate = () => {
+    if (defViewInProgman) return num(a.FindWindowExW(progman, 0, 'WorkerW', null));
     // Classic layout: a top-level WorkerW holds SHELLDLL_DefView and the
     // *next* WorkerW sibling is the one drawn behind the icons.
+    let found = 0;
     a.EnumWindows((hwnd) => {
       const defView = num(a.FindWindowExW(num(hwnd), 0, 'SHELLDLL_DefView', null));
       if (defView) {
-        host = num(a.FindWindowExW(0, num(hwnd), 'WorkerW', null));
-        if (host) return false;
+        found = num(a.FindWindowExW(0, num(hwnd), 'WorkerW', null));
+        if (found) return false;
       }
       return true;
     }, 0);
-    if (!host) host = progman;
+    return found;
+  };
+
+  // Ask Progman to create the WorkerW behind the desktop icons. lParam=1 is the
+  // form current builds expect. Explorer reference-counts these requests on
+  // Windows 11 24H2: lParam=0 releases the WorkerW again and destroys it a
+  // moment later, so the legacy lParam=0 form is only sent when lParam=1
+  // produced nothing (older builds).
+  const out = [0];
+  a.SendMessageTimeoutW(progman, 0x052c, 0xd, 0x1, 0, 1000, out);
+  let host = locate();
+  if (!host) {
+    a.SendMessageTimeoutW(progman, 0x052c, 0xd, 0x0, 0, 1000, out);
+    host = locate();
   }
+  if (!host) host = progman;
   log.info(`wallpaper host hwnd=${host} (progman=${progman}, 24H2 layout=${Boolean(defViewInProgman)})`);
   return { progman, host };
 }
@@ -117,7 +124,10 @@ function attach(win, physical) {
     const found = findWallpaperHost();
     if (!found) return null;
     const hwnd = hwndOf(win);
-    a.SetParent(hwnd, found.host);
+    if (!num(a.SetParent(hwnd, found.host))) {
+      log.error(`SetParent(${hwnd}, ${found.host}) failed (GetLastError=${a.GetLastError()}, host alive=${a.IsWindow(found.host)})`);
+      return null;
+    }
     position(win, physical);
     return found;
   } catch (err) {
@@ -142,17 +152,82 @@ function detach(win) {
   try { a.SetParent(hwndOf(win), 0); } catch (err) { log.error('detach failed', err); }
 }
 
+const fs = require('fs');
+const path = require('path');
+const zlib = require('zlib');
+
+const DARK_FILE = 'luna-dark-wallpaper.png';
+const STATE_FILE = 'wallpaper-state.json';
+const DARK_RGB = [0x06, 0x04, 0x0d]; // the scene's night-sky colour
+
 let originalWallpaper = null;
-function rememberWallpaper() {
+let stateDir = null;
+
+function setSystemWallpaper(a, file) {
+  const buf = Buffer.from(`${file}\0`, 'utf16le');
+  return Boolean(a.SystemParametersInfoW(0x14 /* SPI_SETDESKWALLPAPER */, 0, buf, 0x01 | 0x02 /* UPDATEINIFILE | SENDCHANGE */));
+}
+
+/**
+ * Reads the current wallpaper so it can be restored on quit. The path is also
+ * persisted to `dir` so that, if a previous run died while the dark wallpaper
+ * was applied, the real original is restored rather than our own dark file.
+ */
+function rememberWallpaper(dir) {
   const a = load();
   if (!a) return;
+  stateDir = dir || null;
   try {
     const buf = Buffer.alloc(260 * 2);
     if (a.SystemParametersInfoW(0x73 /* SPI_GETDESKWALLPAPER */, 260, buf, 0)) {
       originalWallpaper = buf.toString('utf16le').split('\0')[0];
-      log.info(`original wallpaper: ${originalWallpaper}`);
     }
+    const stateFile = stateDir && path.join(stateDir, STATE_FILE);
+    if (stateFile && originalWallpaper && path.basename(originalWallpaper).toLowerCase() === DARK_FILE) {
+      // Left over from a run that did not quit cleanly: use what that run saved.
+      try { originalWallpaper = JSON.parse(fs.readFileSync(stateFile, 'utf8')).original || null; } catch (e) { originalWallpaper = null; }
+    } else if (stateFile && originalWallpaper) {
+      try { fs.mkdirSync(stateDir, { recursive: true }); fs.writeFileSync(stateFile, JSON.stringify({ original: originalWallpaper })); } catch (e) { /* ignore */ }
+    }
+    log.info(`original wallpaper: ${originalWallpaper}`);
   } catch (err) { log.error('could not read wallpaper path', err); }
+}
+
+/** Minimal PNG encoder for a solid colour (no pngjs at runtime). */
+function solidPng(width, height, [r, g, b]) {
+  const crcTable = [];
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crcTable[n] = c >>> 0; }
+  const crc = (buf) => { let c = 0xffffffff; for (const byte of buf) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const c = Buffer.alloc(4); c.writeUInt32BE(crc(td));
+    return Buffer.concat([len, td, c]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0; // 8-bit RGB
+  const row = Buffer.alloc(1 + width * 3);
+  for (let x = 0; x < width; x++) { row[1 + x * 3] = r; row[2 + x * 3] = g; row[3 + x * 3] = b; }
+  const raw = Buffer.concat(Array.from({ length: height }, () => row));
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+/**
+ * Switches the system wallpaper to a solid dark picture while Luna runs, so
+ * the translucent taskbar (which blurs the static wallpaper, not our window)
+ * blends with the scene. Returns the file path, or null when not applied.
+ */
+function applyDarkWallpaper(dir) {
+  const a = load();
+  if (!a) return null;
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, DARK_FILE);
+    if (!fs.existsSync(file)) fs.writeFileSync(file, solidPng(64, 64, DARK_RGB));
+    if (!setSystemWallpaper(a, file)) { log.error('could not apply the dark wallpaper'); return null; }
+    return file;
+  } catch (err) { log.error('applyDarkWallpaper failed', err); return null; }
 }
 
 /** Re-applies the wallpaper Windows had before we started (clears the black area left behind). */
@@ -160,8 +235,8 @@ function restoreWallpaper() {
   const a = load();
   if (!a || !originalWallpaper) return;
   try {
-    const buf = Buffer.from(`${originalWallpaper}\0`, 'utf16le');
-    a.SystemParametersInfoW(0x14 /* SPI_SETDESKWALLPAPER */, 0, buf, 0x01 | 0x02);
+    setSystemWallpaper(a, originalWallpaper);
+    if (stateDir) { try { fs.unlinkSync(path.join(stateDir, STATE_FILE)); } catch (e) { /* ignore */ } }
   } catch (err) { log.error('restoreWallpaper failed', err); }
 }
 
@@ -212,4 +287,4 @@ function foregroundCoverage(physical, ownHwnds) {
   }
 }
 
-module.exports = { available: () => Boolean(load()), attach, position, detach, rememberWallpaper, restoreWallpaper, pollCursor, foregroundCoverage, hwndOf };
+module.exports = { available: () => Boolean(load()), attach, position, detach, rememberWallpaper, applyDarkWallpaper, restoreWallpaper, pollCursor, foregroundCoverage, hwndOf };

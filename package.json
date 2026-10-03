@@ -2,7 +2,7 @@
   "name": "luna-wallpaper",
   "productName": "Luna",
   "version": "0.1.0",
-  "description": "Interactive animated pixel-art wallpaper: a gothic girl and her ghost Pok\u00e9mon living on your desktop.",
+  "description": "Interactive animated pixel-art wallpaper: a gothic girl and her ghost Pokémon living on your desktop.",
   "main": "src/main/main.js",
   "private": true,
   "license": "MIT",
@@ -14,7 +14,7 @@
     "assets:pokemon": "node scripts/build-pokemon.js",
     "assets:girl": "node scripts/build-girl.js",
     "assets:icons": "node scripts/build-icons.js",
-    "test": "node test/main-smoke.js && node test/hd-synthetic.js && node test/screenshot.mjs",
+    "test": "node test/main-smoke.js && node test/wallpaper-host.js && node test/hd-synthetic.js && node test/screenshot.mjs",
     "dist": "electron-builder --win",
     "dist:portable": "electron-builder --win portable",
     "assets:hd": "node scripts/hd-assets.js build",
@@ -66,5 +66,9 @@
       "perMachine": false,
       "runAfterFinish": true
     }
+  },
+  "allowScripts": {
+    "koffi@3.3.2": true,
+    "electron-winstaller@5.4.0": true
   }
 }

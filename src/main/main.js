@@ -48,7 +48,9 @@ function start() {
   settings = new Settings(userData);
   log.info(`Luna starting (electron ${process.versions.electron}, ${process.platform}, wallpaper mode: ${wallpaperMode()})`);
   if (process.platform === 'win32') app.setAppUserModelId('com.titorias97.luna');
-  wallpaper.rememberWallpaper();
+  wallpaper.rememberWallpaper(userData);
+  // A dark system wallpaper while we run: the taskbar blur samples it, not our window.
+  if (wallpaperMode()) wallpaper.applyDarkWallpaper(userData);
 
   ipcMain.on('ready', (e) => {
     e.sender.send('settings', settings.forRenderer());
@@ -114,7 +116,13 @@ function createWindows() {
       title: 'Luna',
       frame: false,
       show: false,
-      resizable: FORCE_WINDOW,
+      // Wallpaper mode needs the client area to cover the whole display:
+      // thickFrame adds invisible resize borders (an uncovered strip on the
+      // left) and a non-resizable window is pinned to the work-area height
+      // Chromium clamps it to at creation (a gap under the taskbar). The
+      // window lives behind the icons, so the user cannot resize it anyway.
+      resizable: true,
+      thickFrame: FORCE_WINDOW,
       movable: FORCE_WINDOW,
       minimizable: false,
       maximizable: false,
@@ -241,7 +249,8 @@ function refreshMenu() {
     { label: 'Luna', submenu: radio([['hd', 'HD sprite (Higgsfield)'], ['classic', 'Classic hand-drawn sprite']], 'luna') },
     { label: 'Background', submenu: radio([['hd', 'HD picture (Higgsfield)'], ['classic', 'Classic procedural graveyard']], 'bg') },
     { label: 'Picture detail', submenu: radio([['hd', 'Full resolution'], ['pixel', 'Snapped to the pixel grid']], 'detail') },
-    { label: 'Pixel size', submenu: radio([[0, 'Automatic'], [2, '2×'], [3, '3×'], [4, '4×']], 'scale') },
+    // Pixel scale: one preset per common monitor height (360 logical rows), plus fine steps.
+    { label: 'Resolution', submenu: [...radio([[0, 'Automatic'], [3, '1080p (3×)'], [4, '1440p (4×)'], [6, '4K (6×)']], 'scale'), { type: 'separator' }, ...radio([[2, '2×'], [5, '5×'], [8, '8×']], 'scale')] },
     { label: 'Frame rate', submenu: radio([[24, '24 fps'], [30, '30 fps'], [60, '60 fps']], 'fps') },
     { label: 'Space for the taskbar', submenu: radio([[0, 'None'], [48, '48 px'], [72, '72 px'], [96, '96 px']], 'bottomInset') },
     { label: 'Displays', submenu: radio([['primary', 'Primary display'], ['all', 'All displays']], 'displays', null, () => { createWindows(); refreshMenu(); }) },
