@@ -13,10 +13,11 @@ const path = require('path');
 const { PNG } = require('pngjs');
 
 const ROOT = path.join(__dirname, '..');
-const CACHE = path.join(ROOT, '.cache', 'hd');
+const CACHE = process.env.LUNA_HD_CACHE || path.join(ROOT, '.cache', 'hd');
 const DOCS = path.join(ROOT, 'docs', 'hd');
 const OUT = path.join(ROOT, 'src', 'renderer', 'assets', 'hd');
-const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets-hd.json'), 'utf8'));
+const configFile = process.env.LUNA_HD_CONFIG || path.join(ROOT, 'assets-hd.json');
+const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 const mode = process.argv[2] || 'preview';
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,7 @@ async function download(url, name) {
   fs.mkdirSync(CACHE, { recursive: true });
   const dest = path.join(CACHE, name);
   if (fs.existsSync(dest) && fs.statSync(dest).size > 0) return dest;
+  if (!/^https?:/.test(url)) { fs.copyFileSync(path.resolve(ROOT, url), dest); return dest; } // local file (tests)
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
       const res = await fetch(url);

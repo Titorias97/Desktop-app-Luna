@@ -2,21 +2,74 @@
   "_comment": "Sources generated with Higgsfield (gpt_image_2_5 / nano_banana_pro / flux_3_image / autosprite). scripts/hd-assets.js downloads and processes them.",
   "candidates": {
     "background": [
-      { "id": "gpt-a", "model": "gpt_image_2_5", "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_b76b1d7b-3eca-4cbd-8805-a16d127d0637.png" },
-      { "id": "nano", "model": "nano_banana_pro", "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_9a15e90c-b328-413c-a3a4-44cf4ff977d6.png" },
-      { "id": "flux", "model": "flux_3_image", "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_2901915a-87bd-4090-bbdb-af07f0c5932d.png" },
-      { "id": "gpt-b", "model": "gpt_image_2_5", "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014601_ef96af10-aa32-41ae-9c26-5ff744e57c0c.png" }
+      {
+        "id": "gpt-a",
+        "model": "gpt_image_2_5",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_b76b1d7b-3eca-4cbd-8805-a16d127d0637.png"
+      },
+      {
+        "id": "nano",
+        "model": "nano_banana_pro",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_9a15e90c-b328-413c-a3a4-44cf4ff977d6.png"
+      },
+      {
+        "id": "flux",
+        "model": "flux_3_image",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_2901915a-87bd-4090-bbdb-af07f0c5932d.png"
+      },
+      {
+        "id": "gpt-b",
+        "model": "gpt_image_2_5",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014601_ef96af10-aa32-41ae-9c26-5ff744e57c0c.png"
+      }
     ],
     "luna": [
-      { "id": "gpt", "model": "gpt_image_2_5", "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_873df115-6740-46f2-88f6-97ba58d7a8e9.png", "transparent": true },
-      { "id": "nano", "model": "nano_banana_pro", "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_894107cc-5f29-4895-bdd4-4ffd849b9a61.png", "chroma": "#00ff00" },
-      { "id": "flux", "model": "flux_3_image", "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_45203ad1-3ce3-4df8-8faf-8576fee6f1b8.png", "chroma": "#00ff00" }
+      {
+        "id": "gpt",
+        "model": "gpt_image_2_5",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_873df115-6740-46f2-88f6-97ba58d7a8e9.png",
+        "transparent": true
+      },
+      {
+        "id": "nano",
+        "model": "nano_banana_pro",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_894107cc-5f29-4895-bdd4-4ffd849b9a61.png",
+        "chroma": "#00ff00"
+      },
+      {
+        "id": "flux",
+        "model": "flux_3_image",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_014600_45203ad1-3ce3-4df8-8faf-8576fee6f1b8.png",
+        "chroma": "#00ff00"
+      }
     ],
-    "sheets": []
+    "sheets": [
+      {
+        "id": "gpt-sheet-a",
+        "model": "gpt_image_2_5",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_020830_eda1a6e3-a50a-40e5-9c5d-3c08a4d2eaef.png"
+      },
+      {
+        "id": "gpt-sheet-b",
+        "model": "gpt_image_2_5",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Jgu71ls5JD8iydxidOl3I4KshY/hf_20261003_020830_b69be9ab-859e-407d-a446-c764774889a2.png"
+      }
+    ]
   },
   "chosen": {
     "background": "gpt-a",
     "luna": "gpt",
-    "targetHeight": 84
+    "sheet": null,
+    "targetHeight": 84,
+    "colors": 64,
+    "layout": {
+      "horizon": 0.44,
+      "groundTop": 0.64,
+      "groundBottom": 0.985
+    },
+    "bench": {
+      "x": 0.16,
+      "y": 0.72
+    }
   }
 }
