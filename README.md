@@ -42,6 +42,14 @@ them to a common pixel size, snaps the palette and packs
 stars, lanterns, windows and the moon so the renderer can twinkle, flicker
 and orbit them.
 
+For several monitors the picture is widened into a panorama with Higgsfield
+outpainting (`scripts/hd-panorama.js`): a 9:16 strip from each edge is
+outpainted to 21:9, registered back onto the picture (the service rescales
+narrow inputs, so scale and offset are measured) and crossfaded in. The
+original stays pixel-for-pixel in the middle; the outpainted results are
+listed under `panorama.steps` in `assets-hd.json`, so `npm run assets:hd`
+rebuilds the same panorama.
+
 ```bat
 npm run assets:hd:preview   # docs/hd/ previews of every candidate
 npm run assets:hd           # rebuild src/renderer/assets/hd/ from assets-hd.json
@@ -71,6 +79,23 @@ new tray icons under the `^` overflow button): pause, cursor reactions on/off,
 resolution (automatic, or a 1080p / 1440p / 4K pixel-scale preset), frame
 rate, space for the taskbar, which displays to cover, launch at login. *Quit*
 restores your previous wallpaper.
+
+The weather changes on its own: every few minutes a rain shower or a snowfall
+rolls in (slanted streaks with splashes and a darker sky, or drifting flakes),
+lasts a few minutes and clears. Snow slowly dusts the scenery — caps on roofs,
+branches, fence spikes and gravestones, clumps on the ground — and melts away
+afterwards (faster once it rains). **Weather** in the tray picks random,
+always clear, or rain / snow right now.
+
+With more than one monitor, **Displays → Span across all displays** (the
+default) makes one scene across all of them: Luna and the Pokémon walk from one
+screen onto the next, and the background continues as one wide panorama. The
+main display shows the original picture; the others show the outpainted
+extension on their side. A single renderer simulates the scene and opens one
+window per extra display (`window.open`), each drawing its own slice at that
+display's DPI, so mixed setups such as 1440p at 100% next to 4K at 150% line
+up at the seam. *Same scene on each display* gives every monitor its own copy
+instead.
 
 While Luna runs, the Windows wallpaper is switched to a solid dark picture
 (`%APPDATA%\Luna\luna-dark-wallpaper.png`): the translucent taskbar blurs the

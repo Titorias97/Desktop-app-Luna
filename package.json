@@ -14,7 +14,7 @@
     "assets:pokemon": "node scripts/build-pokemon.js",
     "assets:girl": "node scripts/build-girl.js",
     "assets:icons": "node scripts/build-icons.js",
-    "test": "node test/main-smoke.js && node test/wallpaper-host.js && node test/hd-synthetic.js && node test/screenshot.mjs",
+    "test": "node test/main-smoke.js && node test/wallpaper-host.js && node test/hd-panorama.js && node test/hd-synthetic.js && node test/screenshot.mjs",
     "dist": "electron-builder --win",
     "dist:portable": "electron-builder --win portable",
     "assets:hd": "node scripts/hd-assets.js build",

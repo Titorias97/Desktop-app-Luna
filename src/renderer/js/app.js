@@ -19,6 +19,8 @@
     luna: params.get('luna') || 'hd',     // 'hd' (Higgsfield sprite) | 'classic' (hand-drawn)
     bg: params.get('bg') || 'hd',         // 'hd' (Higgsfield picture) | 'classic' (procedural)
     detail: params.get('detail') || 'hd', // 'hd' (full-resolution picture) | 'pixel' (snapped to the sprite grid)
+    weather: params.get('weather') || 'auto', // 'auto' (random rain/snow) | 'clear' | 'rain' | 'snow'
+    span: null, // set by Electron: one scene across several displays (see src/main/main.js spanLayout)
   };
 
   const canvas = document.getElementById('scene');
@@ -27,6 +29,7 @@
   let world = null;
   let paused = false;
   let assets = null;
+  const extraViews = new Map(); // span view key -> { win, scene, sctx, bg } for the other displays
 
   // ---------------------------------------------------------------------------
   function loadImage(src) {
@@ -55,31 +58,89 @@
   }
 
   // ---------------------------------------------------------------------------
-  /** Integer scale in *physical* pixels so the art stays crisp on 125%/150% DPI displays. */
-  function computeScale() {
-    const dpr = window.devicePixelRatio || 1;
-    const physScale = settings.scale || clamp(Math.round((window.innerHeight * dpr) / 360), 2, 8);
+  /**
+   * The displays this page draws, in CSS px relative to the scene's top-left.
+   * Normally just this window; when spanning, one view per display, and this
+   * window shows the main one.
+   */
+  function sceneLayout() {
+    const own = { key: 'main', x: 0, y: 0, width: window.innerWidth, height: window.innerHeight, dpr: window.devicePixelRatio || 1, main: true };
+    const span = settings.span;
+    if (!span || !span.views || span.views.length < 2) return { width: own.width, height: own.height, views: [own] };
+    const views = span.views.map((v) => (v.main ? { ...v, dpr: own.dpr } : v));
+    return { width: span.width, height: span.height, views };
+  }
+
+  /** Integer scale in *physical* pixels (on the main display) so the art stays crisp on 125%/150% DPI displays. */
+  function computeScale(main) {
+    const dpr = main.dpr;
+    const physScale = settings.scale || clamp(Math.round((main.height * dpr) / 360), 2, 8);
     return { physScale, cssScale: physScale / dpr, dpr };
   }
 
-  function buildWorld() {
-    const { physScale, cssScale, dpr } = computeScale();
-    const W = Math.ceil((window.innerWidth * dpr) / physScale);
-    const H = Math.ceil((window.innerHeight * dpr) / physScale);
-    canvas.width = W;
-    canvas.height = H;
-    canvas.style.width = `${W * cssScale}px`;
-    canvas.style.height = `${H * cssScale}px`;
-    ctx.imageSmoothingEnabled = false;
-    const useHdBg = settings.bg === 'hd' && assets.hdBg;
-    // The full-resolution picture lives on its own canvas behind the pixel scene.
-    bgCanvas.style.display = useHdBg ? 'block' : 'none';
-    if (useHdBg) {
-      bgCanvas.width = Math.round(W * physScale);
-      bgCanvas.height = Math.round(H * physScale);
-      bgCanvas.style.width = `${W * cssScale}px`;
-      bgCanvas.style.height = `${H * cssScale}px`;
+  /**
+   * Spanning: one window per extra display, opened from here (main.js places
+   * it and parks it behind the icons) so the single simulation can draw into it.
+   */
+  function syncExtraViews(views) {
+    const wanted = new Set(views.filter((v) => !v.main).map((v) => v.key));
+    for (const [key, s] of extraViews) {
+      if (!wanted.has(key) || s.win.closed) { try { s.win.close(); } catch (e) { /* gone */ } extraViews.delete(key); }
     }
+    for (const key of wanted) {
+      if (extraViews.has(key)) continue;
+      const win = window.open('', `luna-view-${key}`);
+      if (!win) continue;
+      const doc = win.document;
+      doc.title = 'Luna';
+      const style = doc.createElement('style');
+      style.textContent = 'html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06040d}canvas{position:absolute;top:0;left:0;display:block}.px{image-rendering:pixelated}';
+      doc.head.appendChild(style);
+      const bg = doc.createElement('canvas');
+      const scene = doc.createElement('canvas');
+      scene.className = 'px';
+      doc.body.append(bg, scene);
+      extraViews.set(key, { win, bg, scene, sctx: scene.getContext('2d') });
+    }
+  }
+
+  function buildWorld() {
+    const screens = sceneLayout();
+    const main = screens.views.find((v) => v.main);
+    const { physScale, cssScale } = computeScale(main);
+    const W = Math.ceil(screens.width / cssScale);
+    const H = Math.ceil(screens.height / cssScale);
+    syncExtraViews(screens.views);
+    // Every display shows the whole scene canvas, shifted so its own part is on screen.
+    const surfaces = screens.views.map((v) => {
+      const extra = extraViews.get(v.key);
+      return {
+        view: v,
+        scene: extra ? extra.scene : canvas,
+        bg: extra ? extra.bg : bgCanvas,
+        rect: { x: v.x / cssScale, y: v.y / cssScale, w: v.width / cssScale, h: v.height / cssScale },
+      };
+    }).filter((s) => s.view.main || extraViews.has(s.view.key));
+    const useHdBg = settings.bg === 'hd' && assets.hdBg;
+    for (const s of surfaces) {
+      const { view: v, scene, bg } = s;
+      scene.width = W;
+      scene.height = H;
+      scene.style.width = `${W * cssScale}px`;
+      scene.style.height = `${H * cssScale}px`;
+      scene.style.left = `${-v.x}px`;
+      scene.style.top = `${-v.y}px`;
+      // The full-resolution picture lives on its own canvas behind the pixel scene.
+      bg.style.display = useHdBg ? 'block' : 'none';
+      if (useHdBg) {
+        bg.width = Math.round(v.width * v.dpr);
+        bg.height = Math.round(v.height * v.dpr);
+        bg.style.width = `${v.width}px`;
+        bg.style.height = `${v.height}px`;
+      }
+    }
+    ctx.imageSmoothingEnabled = false;
+    const frame = surfaces.find((s) => s.view.main).rect;
 
     const scale = cssScale; // CSS px per logical pixel (pointer conversion)
     const inset = Math.ceil(settings.bottomInset / physScale);
@@ -87,6 +148,8 @@
     const rng = makeRng(seed ^ 0x9e3779b9);
     const w = {
       W, H, scale, physScale, rng, settings,
+      origin: { x: main.x, y: main.y }, // where this window sits in the scene (CSS px)
+      mirrors: surfaces.filter((s) => s.scene !== canvas).map((s) => extraViews.get(s.view.key)),
       time: 0,
       pointer: { x: -1, y: -1, present: false },
       steppers: new Set(),
@@ -94,7 +157,9 @@
       pokemon: {},
     };
     if (useHdBg) {
-      w.bg = new Luna.ImageBackground(assets.images.hdBg, assets.hdBg, W, H, { detail: settings.detail, bgCanvas, inset });
+      w.bg = new Luna.ImageBackground(assets.images.hdBg, assets.hdBg, W, H, {
+        detail: settings.detail, inset, frame, surfaces: surfaces.map((s) => ({ canvas: s.bg, rect: s.rect })),
+      });
       w.layout = w.bg.layout;
     } else {
       w.layout = {
@@ -107,11 +172,12 @@
     const layout = w.layout;
     w.zone = { x0: 18, x1: W - 18, y0: layout.groundTop + 8, y1: layout.groundBottom };
     w.opaqueScene = !useHdBg;
+    w.weather = new Luna.Weather(w);
     w.particles = new Particles(w);
     w.bubbles = new Bubbles(w);
     const useHdGirl = settings.luna === 'hd' && assets.hdGirl;
     w.girl = useHdGirl ? new Girl(w, assets.images.hdGirl, assets.hdGirl) : new Girl(w, assets.images.girl, assets.girlMeta);
-    w.girl.x = Math.round(W * 0.5);
+    w.girl.x = Math.round(frame.x + frame.w * 0.5); // middle of the main display
     w.girl.y = Math.round((w.zone.y0 + w.zone.y1) / 2);
     w.entities.push(w.girl);
     POKEMON_ORDER.forEach((id, i) => {
@@ -128,7 +194,7 @@
     });
     w.director = new Luna.Director(w);
     w.releaseAll = () => releaseAll(w);
-    // Vignette
+    // Vignette over the whole scene: spanning, it darkens only the outer edges, never a seam.
     const v = document.createElement('canvas');
     v.width = W; v.height = H;
     const vg = v.getContext('2d');
@@ -200,12 +266,15 @@
       window.luna.onPause((v) => { paused = v; });
       window.luna.onSettings((s) => applySettings(s));
     }
-    // DOM events (browser preview, Lively, Wallpaper Engine; also Electron dev windows)
-    window.addEventListener('mousemove', (e) => setPointer(e.clientX, e.clientY, true));
+    // DOM events (browser preview, Lively, Wallpaper Engine; also Electron dev windows).
+    // Client coordinates are relative to this window, which may be one part of a spanned scene.
+    const sx = (cx) => (world ? cx + world.origin.x : cx);
+    const sy = (cy) => (world ? cy + world.origin.y : cy);
+    window.addEventListener('mousemove', (e) => setPointer(sx(e.clientX), sy(e.clientY), true));
     window.addEventListener('mouseleave', () => setPointer(0, 0, false));
     document.addEventListener('mouseleave', () => setPointer(0, 0, false));
-    window.addEventListener('mousedown', (e) => { if (e.button === 0 && world) handleClick(e.clientX / world.scale, e.clientY / world.scale); });
-    window.addEventListener('touchstart', (e) => { const t = e.touches[0]; if (t && world) handleClick(t.clientX / world.scale, t.clientY / world.scale); }, { passive: true });
+    window.addEventListener('mousedown', (e) => { if (e.button === 0 && world) handleClick(sx(e.clientX) / world.scale, sy(e.clientY) / world.scale); });
+    window.addEventListener('touchstart', (e) => { const t = e.touches[0]; if (t && world) handleClick(sx(t.clientX) / world.scale, sy(t.clientY) / world.scale); }, { passive: true });
     document.addEventListener('visibilitychange', () => { if (document.hidden) lastFrame = 0; });
     let resizeTimer = 0;
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { world = buildWorld(); }, 250); });
@@ -218,6 +287,8 @@
     if (s.interactive !== undefined) settings.interactive = s.interactive;
     for (const k of ['luna', 'bg', 'detail']) if (s[k] !== undefined && s[k] !== settings[k]) { settings[k] = s[k]; rebuild = true; }
     if (s.fps !== undefined && s.fps) settings.fps = s.fps;
+    if (s.weather !== undefined && s.weather !== settings.weather) { settings.weather = s.weather; if (world) world.weather.setMode(s.weather); }
+    if (s.span !== undefined && JSON.stringify(s.span) !== JSON.stringify(settings.span)) { settings.span = s.span; rebuild = true; }
     if (rebuild && assets) world = buildWorld();
   }
 
@@ -228,6 +299,7 @@
   function update(w, dt) {
     w.time += dt;
     w.bg.update(dt);
+    w.weather.update(dt);
     w.director.update(dt);
     for (const fn of w.steppers) fn(dt);
     for (const e of w.entities) e.update(dt);
@@ -238,6 +310,7 @@
   function render(w) {
     if (w.opaqueScene) { ctx.fillStyle = '#06040d'; ctx.fillRect(0, 0, w.W, w.H); }
     w.bg.drawBack(ctx);
+    w.weather.drawCover(ctx);
     const air = w.entities.filter((e) => e.airborne);
     for (const e of air) e.draw(ctx);
     const ground = w.entities.filter((e) => !e.airborne);
@@ -248,11 +321,17 @@
     w.particles.draw(ctx);
     w.bubbles.draw(ctx);
     w.bg.drawFront(ctx);
+    w.weather.drawFront(ctx);
     ctx.drawImage(w.vignette, 0, 0);
     if (settings.debug) {
       ctx.fillStyle = '#fff';
       ctx.font = '8px monospace';
-      ctx.fillText(`${fpsCounter.value} fps  scene:${w.director.current ? w.director.current.name : '-'}  ptr:${w.pointer.present ? `${w.pointer.x | 0},${w.pointer.y | 0}` : '-'}`, 3, 9);
+      ctx.fillText(`${fpsCounter.value} fps  scene:${w.director.current ? w.director.current.name : '-'}  ptr:${w.pointer.present ? `${w.pointer.x | 0},${w.pointer.y | 0}` : '-'}`, w.origin.x / w.scale + 3, w.origin.y / w.scale + 9);
+    }
+    // Spanning: the other displays show the same frame (their windows shift it into place).
+    for (const m of w.mirrors) {
+      m.sctx.clearRect(0, 0, w.W, w.H);
+      m.sctx.drawImage(canvas, 0, 0);
     }
   }
 
@@ -293,6 +372,6 @@
     }
   }
 
-  Luna.app = { get world() { return world; }, get assets() { return assets; }, settings, fastForward, handleClick, setPointer, applySettings };
+  Luna.app = { get world() { return world; }, get assets() { return assets; }, get extraViews() { return extraViews; }, settings, fastForward, handleClick, setPointer, applySettings };
   boot();
 })(window.Luna);

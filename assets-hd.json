@@ -71,5 +71,26 @@
       "x": 0.16,
       "y": 0.72
     }
+  },
+  "panorama": {
+    "_comment": "The chosen background grown sideways for spanning several displays: Higgsfield outpaint of a 9:16 edge strip, applied in order by scripts/hd-panorama.js.",
+    "steps": [
+      {
+        "side": "left",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3KxviBKEXN2XDN1vU0Jmg5l0y12/hf_20261023_192700_b14ef2dd-0c37-4ae3-af21-3bd85fd0edc2.png"
+      },
+      {
+        "side": "right",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3KxviBKEXN2XDN1vU0Jmg5l0y12/hf_20261023_192702_face0470-48ff-4a37-ba2c-a19776e619cd.png"
+      },
+      {
+        "side": "left",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3KxviBKEXN2XDN1vU0Jmg5l0y12/hf_20261023_193415_a4ed7d86-3c4c-4f55-bc13-69f92877e1db.png"
+      },
+      {
+        "side": "right",
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3KxviBKEXN2XDN1vU0Jmg5l0y12/hf_20261023_193417_09b6cd34-ec96-4d7f-862f-b17711ade4dc.png"
+      }
+    ]
   }
 }

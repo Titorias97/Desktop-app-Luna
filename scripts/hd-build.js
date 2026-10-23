@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PNG } = require('pngjs');
+const panorama = require('./hd-panorama');
 
 const POSES = ['idle0', 'walk0', 'walk1', 'walk2', 'pet0', 'pet1', 'wave0', 'wave1', 'sit0', 'startle0', 'reach0', 'happy0'];
 const ANIMATIONS = {
@@ -33,18 +34,33 @@ module.exports = async function build(t) {
   const bgSrc = config.candidates.background.find((c) => c.id === chosen.background);
   if (!bgSrc) throw new Error(`unknown background ${chosen.background}`);
   const bgFile = await download(bgSrc.url, `bg-${bgSrc.id}.png`);
-  const bg = readPng(bgFile);
-  fs.copyFileSync(bgFile, path.join(OUT, 'bg.png'));
+  const original = readPng(bgFile);
+  // Spanning several displays needs a wider picture: the original grown sideways
+  // by outpainted edge strips (scripts/hd-panorama.js), recorded step by step.
+  let bg = original;
+  const steps = (config.panorama && config.panorama.steps) || [];
+  for (const [i, step] of steps.entries()) {
+    const file = await download(step.url, `pano-${i}-${step.side}.png`);
+    bg = panorama.grow(bg, step.side, readPng(file));
+  }
+  const main = steps.length ? panorama.locate(bg, original) : { x: 0, w: 1, px: 0 };
+  if (steps.length) writePng(path.join(OUT, 'bg.png'), bg);
+  else fs.copyFileSync(bgFile, path.join(OUT, 'bg.png'));
+  // Positions measured on the original are converted to fractions of the panorama.
+  const px = (f) => +((main.px + f * original.width) / bg.width).toFixed(4);
+  const originalMoon = analyseBackground(original, chosen.layout).moon;
   const analysis = analyseBackground(bg, chosen.layout);
   const bgMeta = {
     available: true,
     file: 'hd/bg.png',
     width: bg.width,
     height: bg.height,
-    source: { model: bgSrc.model, url: bgSrc.url },
+    source: { model: bgSrc.model, url: bgSrc.url, panorama: steps.map((s) => s.url) },
+    main: { x: main.x, w: main.w },
     layout: chosen.layout,
-    bench: chosen.bench,
-    moon: analysis.moon,
+    bench: chosen.bench && { x: px(chosen.bench.x), y: chosen.bench.y },
+    moon: { x: px(originalMoon.x), y: originalMoon.y, r: +((originalMoon.r * original.width) / bg.width).toFixed(4) },
+    // The panorama may have grown moons of its own; the real one keeps its glow.
     stars: analysis.stars,
     lights: analysis.lights,
     seed: 7,
@@ -304,6 +320,7 @@ function analyseBackground(png, layout) {
     return out;
   };
   const skyBottom = Math.floor(layout.horizon * h);
+  const wide = Math.max(1, (png.width / png.height) / (16 / 9)); // a panorama gets proportionally more stars and lights
   // Moon: biggest bright, low-saturation blob in the sky.
   const brightMask = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) brightMask[i] = i < skyBottom * w && lum[i] > 200 && Math.max(R[i], G[i], B[i]) - Math.min(R[i], G[i], B[i]) < 70 ? 1 : 0;
@@ -312,11 +329,11 @@ function analyseBackground(png, layout) {
   const moon = moonBlob ? { x: moonBlob.x / w, y: moonBlob.y / h, r: Math.sqrt(moonBlob.area / Math.PI) / w } : { x: 0.8, y: 0.12, r: 0.05 };
   // Stars: small bright specks away from the moon.
   const stars = bright.filter((b) => b.area <= 20 && b !== moonBlob && Math.hypot(b.x - (moon.x * w), b.y - (moon.y * h)) > moon.r * w * 1.6)
-    .sort((a, b) => b.maxL - a.maxL).slice(0, 160).map((b) => [+(b.x / w).toFixed(4), +(b.y / h).toFixed(4)]);
+    .sort((a, b) => b.maxL - a.maxL).slice(0, Math.round(160 * wide)).map((b) => [+(b.x / w).toFixed(4), +(b.y / h).toFixed(4)]);
   // Warm lights: amber pixels (lanterns, windows, candles) anywhere.
   const warmMask = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) warmMask[i] = R[i] > 190 && G[i] > 110 && G[i] < 230 && B[i] < 130 && R[i] - B[i] > 90 ? 1 : 0;
-  const lights = blobsOf(warmMask, 1e9).filter((b) => b.area >= 6 && b.area <= 3000).sort((a, b) => b.area - a.area).slice(0, 80)
+  const lights = blobsOf(warmMask, 1e9).filter((b) => b.area >= 6 && b.area <= 3000).sort((a, b) => b.area - a.area).slice(0, Math.round(80 * wide))
     .map((b) => [+(b.x / w).toFixed(4), +(b.y / h).toFixed(4), +(Math.sqrt(b.area) / w).toFixed(4)]);
   return { moon: { x: +moon.x.toFixed(4), y: +moon.y.toFixed(4), r: +moon.r.toFixed(4) }, stars, lights };
 }

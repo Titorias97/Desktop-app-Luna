@@ -10,10 +10,12 @@ const DEFAULTS = {
   luna: 'hd',     // 'hd' (Higgsfield sprite) | 'classic' (hand-drawn)
   bg: 'hd',       // 'hd' (Higgsfield picture) | 'classic' (procedural graveyard)
   detail: 'hd',   // 'hd' (full-resolution picture) | 'pixel' (snapped to the sprite grid)
-  displays: 'primary', // 'primary' | 'all'
+  weather: 'auto', // 'auto' (rain or snow now and then) | 'clear' | 'rain' | 'snow'
+  displays: 'span', // 'span' (one scene across all displays) | 'all' (a copy per display) | 'primary'
   paused: false,
   pauseWhenCovered: true, // also pause behind maximized windows (saves battery)
   launchAtLogin: false,
+  version: 2,
 };
 
 class Settings {
@@ -21,7 +23,12 @@ class Settings {
     this.file = path.join(dir, 'settings.json');
     this.data = { ...DEFAULTS };
     try {
-      if (fs.existsSync(this.file)) Object.assign(this.data, JSON.parse(fs.readFileSync(this.file, 'utf8')));
+      if (fs.existsSync(this.file)) {
+        const saved = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+        // Version 1 saved its 'primary' default along with everything else; span is the new default.
+        if (!saved.version && saved.displays === 'primary') delete saved.displays;
+        Object.assign(this.data, saved, { version: DEFAULTS.version });
+      }
     } catch (e) { /* corrupt file: keep defaults */ }
   }
   get(key) { return this.data[key]; }
@@ -32,8 +39,8 @@ class Settings {
   }
   /** The subset the renderer cares about. */
   forRenderer() {
-    const { scale, bottomInset, interactive, fps, luna, bg, detail } = this.data;
-    return { scale, bottomInset, interactive, fps, luna, bg, detail };
+    const { scale, bottomInset, interactive, fps, luna, bg, detail, weather } = this.data;
+    return { scale, bottomInset, interactive, fps, luna, bg, detail, weather };
   }
 }
 
