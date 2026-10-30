@@ -29,7 +29,7 @@ const POKEMON = [
   { id: 'piplup',        dex: 393,   kind: 'anim' },
   { id: 'drifblim',      dex: 426,   kind: 'anim' },
   { id: 'mamoswine',     dex: 473,   kind: 'anim' },
-  { id: 'lunatone',      dex: 337,   kind: 'anim' },
+  { id: 'mismagius',     dex: 429,   kind: 'anim' },
   { id: 'espeon',        dex: 196,   kind: 'anim' },
 ];
 

@@ -190,7 +190,7 @@
     piplup: { kind: 'walker', hover: 0, bob: [0, 1], speed: 28, follow: 'luna', followDist: 30, hoppy: true, zone: 'ground' },
     drifblim: { kind: 'floater', hover: 54, bob: [6, 5.5], speed: 10, curious: 0.6, zone: 'ground' },
     mamoswine: { kind: 'walker', hover: 0, bob: [0, 1], speed: 12, lazy: true, zone: 'ground', heavy: true },
-    lunatone: { kind: 'floater', hover: 60, bob: [3, 3.0], speed: 20, orbit: true, glow: ['#ffe39a', 22, 0.12], zone: 'sky' },
+    mismagius: { kind: 'floater', hover: 12, bob: [3, 2.6], speed: 18, alpha: 0.95, curious: 0.7, glow: ['#d36bff', 30, 0.16], zone: 'ground' },
     espeon: { kind: 'walker', hover: 0, bob: [0, 1], speed: 34, gem: true, zone: 'ground' },
   };
 

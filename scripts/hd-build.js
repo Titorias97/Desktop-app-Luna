@@ -17,7 +17,7 @@ const POSES = ['idle0', 'walk0', 'walk1', 'walk2', 'pet0', 'pet1', 'wave0', 'wav
 const ANIMATIONS = {
   idle: { frames: ['idle0'], ms: [1000], loop: true },
   walk: { frames: ['walk0', 'walk1', 'walk2', 'walk1'], ms: [150, 150, 150, 150], loop: true },
-  pet: { frames: ['pet0', 'pet1'], ms: [320, 320], loop: true },
+  pet: { frames: ['pet0', 'pet1'], ms: [320, 320], loop: true }, // kneeling; replaced by the standing pet when the extra sheet has it
   wave: { frames: ['wave0', 'wave1'], ms: [260, 260], loop: true },
   sit: { frames: ['sit0'], ms: [1000], loop: true },
   startle: { frames: ['startle0'], ms: [600], loop: false },
@@ -63,6 +63,8 @@ module.exports = async function build(t) {
     // The panorama may have grown moons of its own; the real one keeps its glow.
     stars: analysis.stars,
     lights: analysis.lights,
+    // Outlines (fractions of the panorama) of things standing on the ground; snow keeps clear of them.
+    uprights: (config.panorama && config.panorama.uprights) || [],
     seed: 7,
   };
   fs.writeFileSync(path.join(OUT, 'bg.js'), `window.LUNA_HD_BG = ${JSON.stringify(bgMeta)};\n`);
@@ -103,6 +105,28 @@ module.exports = async function build(t) {
     const tb = bbox(img, 0);
     return { name, png: tb ? crop(img, tb) : img };
   });
+  // Extra poses from a second sheet (2x2, idle first as the scale reference): standing pet, bench sit.
+  const extraSrc = chosen.extraSheet && config.candidates.sheets.find((c) => c.id === chosen.extraSheet);
+  const animations = JSON.parse(JSON.stringify(ANIMATIONS));
+  if (extraSrc) {
+    const extra = readPng(await download(extraSrc.url, `sheet-${extraSrc.id}.png`));
+    const ecells = gridCells(extra, 2, 2);
+    if (!ecells || !ecells[0]) throw new Error(`extra sheet ${extraSrc.id}: poses not found`);
+    const efactor = ecells[0].h / (chosen.targetHeight || 84);
+    chosen.extraPoses.forEach((name, i) => {
+      const b = ecells[i + 1];
+      if (!b) { console.warn(`extra pose ${name} missing`); return; }
+      const img = downscale(crop(extra, b), efactor);
+      snapAlpha(img, 128);
+      const tb = bbox(img, 0);
+      frames.push({ name, png: tb ? crop(img, tb) : img });
+    });
+    const has = (n) => frames.some((f) => f.name === n);
+    // Luna asked not to kneel on the ground: pet standing up, sit on things with her legs hanging.
+    if (has('petStand0') && has('petStand1')) animations.pet = { frames: ['petStand0', 'petStand1'], ms: [340, 340], loop: true };
+    if (has('bench0')) animations.sit = { frames: ['bench0'], ms: [1000], loop: true };
+    console.log(`extra sheet ${extraSrc.id}: ${ecells.map((c) => (c ? `${c.w}x${c.h}` : '-')).join(' ')}`);
+  }
   quantise(frames.map((f) => f.png), chosen.colors || 64);
   const fw = Math.max(...frames.map((f) => f.png.width)) + 2;
   const fh = Math.max(...frames.map((f) => f.png.height)) + 1;
@@ -124,8 +148,8 @@ module.exports = async function build(t) {
     anchor: { x: fw / 2, y: fh },
     baseFacing: 1,
     bob: [1, 3.4],
-    frames: Object.fromEntries(POSES.map((n, i) => [n, i])),
-    animations: ANIMATIONS,
+    frames: Object.fromEntries(frames.map((f, i) => [f.name, i])),
+    animations,
     source: { model: sheetSrc.model, url: sheetSrc.url },
   };
   fs.writeFileSync(path.join(OUT, 'luna.js'), `window.LUNA_GIRL_HD = ${JSON.stringify(manifest)};\n`);

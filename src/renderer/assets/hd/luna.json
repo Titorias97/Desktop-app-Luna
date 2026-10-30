@@ -25,7 +25,10 @@
     "sit0": 8,
     "startle0": 9,
     "reach0": 10,
-    "happy0": 11
+    "happy0": 11,
+    "petStand0": 12,
+    "petStand1": 13,
+    "bench0": 14
   },
   "animations": {
     "idle": {
@@ -54,12 +57,12 @@
     },
     "pet": {
       "frames": [
-        "pet0",
-        "pet1"
+        "petStand0",
+        "petStand1"
       ],
       "ms": [
-        320,
-        320
+        340,
+        340
       ],
       "loop": true
     },
@@ -76,7 +79,7 @@
     },
     "sit": {
       "frames": [
-        "sit0"
+        "bench0"
       ],
       "ms": [
         1000

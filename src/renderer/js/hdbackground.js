@@ -60,12 +60,18 @@
         groundBottom: Math.min(frame.y + frame.h - opts.inset - 4, fy(L.groundBottom)),
       };
       this.benchSpot = meta.bench ? { x: fx(meta.bench.x), y: fy(meta.bench.y) } : { x: Math.round(W * 0.3), y: this.layout.groundTop + 16 };
+      this.benchSpot.half = Math.round(fit.w * 0.065); // half the bench's width (clicking it makes Luna sit)
       this.moon = meta.moon
         ? { x: fx(meta.moon.x), y: fy(meta.moon.y), r: Math.max(8, Math.round(meta.moon.r * this.fit.w)), lit: 1 }
         : { x: Math.round(W * 0.8), y: Math.round(this.layout.horizon * 0.3), r: 18, lit: 1 };
       this.moons = meta.moon ? everyTile([meta.moon], (m, _i, x) => ({ ...this.moon, x: x(m.x) })) : [this.moon];
       this.stars = everyTile(meta.stars || [], ([x, y], i, tx) => ({ x: tx(x), y: fy(y), phase: (i * 0.73) % 6.28, speed: 0.8 + ((i * 7) % 10) / 8, color: ['#ffffff', '#fff4d6', '#d8e4ff'][i % 3], big: false }));
       this.lights = everyTile(meta.lights || [], ([x, y, size], i, tx) => ({ x: tx(x), y: fy(y), size: Math.max(6, Math.round(size * this.fit.w)), seed: i * 1.37 }));
+      // Outlines of things standing on the ground, so snow does not bury them.
+      this.uprights = this.tiles.flatMap((tile) => (meta.uprights || []).map((u) => ({
+        bars: !!u.bars,
+        poly: u.poly.map(([x, y]) => [tile.x + (tile.mirror ? 1 - x : x) * this.fit.w, this.fit.y + y * this.fit.h]),
+      }))).filter((u) => u.poly.some(([x]) => x > 0 && x < W));
       this.props = [];
       // Procedural helper only for the live layers (fog/bats/wisps/shooting stars).
       this.live = new Luna.Background(W, H, this.layout, (meta.seed || 7) + 1, { liveOnly: true });

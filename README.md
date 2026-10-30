@@ -2,7 +2,7 @@
 
 An interactive, animated pixel-art desktop wallpaper: a small gothic girl in a
 black lolita dress lives in a moonlit graveyard with her Pokémon — **Gengar,
-Chandelure, Mega Froslass, Mega Altaria, Piplup, Drifblim, Mamoswine, Lunatone
+Chandelure, Mega Froslass, Mega Altaria, Piplup, Drifblim, Mamoswine, Mismagius
 and Espeon** — and plays with them all night.
 
 ![idle scene](docs/preview-hd.png)
@@ -17,13 +17,20 @@ back on from the tray menu.*
   Wallpaper Engine / Lively), with a tray icon for settings.
 - **Reacts to your cursor**: hover a Pokémon and it hops, sparkles or sings;
   Gengar and Drifblim drift curiously toward the cursor, Mega Froslass shyly
-  slips away. Click a Pokémon and Luna walks over to pet it (hearts!). Click
-  Luna and she waves. Click the ground and she walks there.
+  slips away. Click a Pokémon and it plays its own special scene with Luna
+  (Gengar's prank, the Mamoswine and Drifblim rides, Froslass's waltz, Altaria
+  landing, Chandelure's light, Mismagius's spell, Piplup gets kicked); the
+  others walk over to meet her and get petted (hearts!). Click Luna and she
+  waves, click the bench and she sits down, click the ground and she walks there.
 - **Little stories on their own**: Gengar sneaks up and startles her, she rides
   Mamoswine across the garden, Drifblim lifts her for a balloon ride, Mega
   Altaria lands to be petted, Mega Froslass waltzes around her in a flurry of
-  snow, Piplup parades, Lunatone descends from the moon, Chandelure lights her
-  way, and late at night she naps on the stone bench with Espeon and Piplup.
+  snow, Piplup parades, Mismagius casts a spell that lifts her off her feet,
+  Chandelure lights her
+  way, she rests on the stone bench, and late at night she naps there with
+  Espeon and Piplup. She pets them standing up and sits on things with her legs
+  hanging (extra poses generated from her sprite sheet, `gpt-extra-a` in
+  `assets-hd.json`).
 - **Living background**: dithered night sky, twinkling stars, drifting clouds,
   bats, shooting stars, a mansion with flickering windows, lanterns,
   will-o'-wisps and fog. The moon shows the **real lunar phase** for today.
@@ -80,11 +87,13 @@ resolution (automatic, or a 1080p / 1440p / 4K pixel-scale preset), frame
 rate, space for the taskbar, which displays to cover, launch at login. *Quit*
 restores your previous wallpaper.
 
-The weather changes on its own: every few minutes a rain shower or a snowfall
-rolls in (slanted streaks with splashes and a darker sky, or drifting flakes),
-lasts a few minutes and clears. Snow slowly dusts the scenery — caps on roofs,
-branches, fence spikes and gravestones, clumps on the ground — and melts away
-afterwards (faster once it rains). **Weather** in the tray picks random,
+The weather changes on its own: after a clear spell of 10–25 minutes a rain
+shower or a snowfall rolls in (slanted streaks with splashes and a darker sky, or drifting flakes),
+lasts 3–7 minutes and clears. Snow slowly dusts the scenery — caps on roofs,
+branches, fence spikes and gravestones, clumps on the ground — until the whole
+ground lies under snow, with gravestones, the bench, trees and fences standing out
+of it (their outlines are in `assets-hd.json`, `panorama.uprights`). It melts
+away afterwards (faster once it rains). **Weather** in the tray picks random,
 always clear, or rain / snow right now.
 
 With more than one monitor, **Displays → Span across all displays** (the

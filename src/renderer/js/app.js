@@ -6,7 +6,7 @@
   const { clamp, rnd, makeRng, dist } = Luna.util;
   const { Girl, Pokemon, Particles, Bubbles } = Luna.entities;
 
-  const POKEMON_ORDER = ['gengar', 'chandelure', 'froslass-mega', 'altaria-mega', 'piplup', 'drifblim', 'mamoswine', 'lunatone', 'espeon'];
+  const POKEMON_ORDER = ['gengar', 'chandelure', 'froslass-mega', 'altaria-mega', 'piplup', 'drifblim', 'mamoswine', 'mismagius', 'espeon'];
 
   const params = new URLSearchParams(location.search);
   const settings = {
@@ -225,6 +225,16 @@
   }
 
   // ---------------------------------------------------------------------------
+  const SPECIAL_ON_CLICK = {
+    gengar: 'gengarPrank',
+    chandelure: 'chandelureLight',
+    'froslass-mega': 'froslassWaltz',
+    piplup: 'piplupKick', // poor Piplup
+    drifblim: 'drifblimRide',
+    mamoswine: 'mamoswineRide',
+    mismagius: 'mismagiusSpell',
+  };
+
   function handleClick(x, y) {
     if (!world || !settings.interactive) return;
     const w = world;
@@ -232,15 +242,18 @@
     const hits = w.entities.filter((e) => e.contains(x, y, 2)).sort((a, b) => b.sortY - a.sortY);
     // A Pokémon standing in front of (or behind) Luna wins: she is big and easy to hit elsewhere.
     const hit = hits.find((e) => e !== w.girl) || hits[0];
+    const S = Luna.SCENES;
+    const b = w.bg.benchSpot;
     if (hit === w.girl) {
-      w.director.start('userWave', Luna.SCENES.userWave(w));
+      w.director.start('userWave', S.userWave(w));
     } else if (hit) {
       hit.react('love');
-      const S = Luna.SCENES;
-      if (hit === w.pokemon.piplup) w.director.start('piplupKick', S.piplupKick(w));          // poor Piplup
-      else if (hit.name === 'altaria-mega') { if (hit.mode === 'fly') w.director.start('altariaLanding', S.altariaLanding(w)); }
-      else if (hit.name === 'lunatone') { if (hit.mode === 'orbit') w.director.start('lunatoneVisit', S.lunatoneVisit(w)); }
+      // Every Pokémon's own special scene starts when you click it (they still happen on their own too).
+      const special = hit.name === 'altaria-mega' ? (hit.mode === 'fly' ? 'altariaLanding' : null) : SPECIAL_ON_CLICK[hit.name];
+      if (special) w.director.start(special, S[special](w));
       else if (!hit.airborne) w.director.start('userMeet', S.userMeet(w, hit));              // both walk to meet halfway
+    } else if (b && Math.abs(x - b.x) <= (b.half || 24) && y >= b.y - 22 && y <= b.y + 6) {
+      w.director.start('benchRest', S.benchRest(w));                                         // sit on the bench
     } else {
       // Walk there (clamped into the garden), scatter sparkles where she clicked.
       w.particles.burst('sparkleSmall', x, y, 3);

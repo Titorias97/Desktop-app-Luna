@@ -1,7 +1,8 @@
 /* Weather: now and then rain or snow rolls in, lasts a few minutes and clears.
  * Rain draws slanted streaks with splashes and darkens the scene; snow drifts
  * down and slowly dusts the scenery (tops of roofs, branches, fence spikes and
- * gravestones, plus patches on the ground), then melts away after it stops.
+ * gravestones, plus patches on the ground) until the whole ground is white,
+ * then melts away after it stops.
  * The snow cover is worked out once per world from a snapshot of the
  * background, at the logical pixel size, so it looks like part of the art. */
 (function (Luna) {
@@ -12,6 +13,7 @@
   const SNOW_GROW = 1 / 70;   // cover per second at full snowfall
   const SNOW_MELT = 1 / 150;  // cover lost per second once it has stopped
   const TIERS = 3;            // the cover spreads in steps: caps and thick patches first
+  const BLANKET_AT = 0.7;     // past this much cover the clumps join into a full blanket
 
   class Weather {
     /** @param {object} w the world (W, H, layout, bg, settings.seed, settings.weather) */
@@ -22,7 +24,7 @@
       this.target = 0;         // intensity we are heading to
       this.intensity = 0;      // 0..1, how hard it is falling
       this.cover = 0;          // 0..1, how much snow lies on the scenery
-      this.timer = rnd(this.rng, 180, 480); // first change comes after a while
+      this.timer = rnd(this.rng, 300, 900); // first change comes after a while
       this.drops = [];
       this.splashes = [];
       this.flakes = [];
@@ -80,8 +82,9 @@
       const flatB = grid(4, 2);
       const clump = (x, y) => flatA(x, y) * 0.65 + flatB(x, y) * 0.35;
       const depthOf = (y) => clamp((y - layout.groundTop) / Math.max(1, H - layout.groundTop), 0, 1);
-      const threshold = (y) => 0.67 - 0.07 * depthOf(y); // a little more snow nearer the viewer
-      const inClump = (x, y) => y >= layout.groundTop && y < H && clump(x, y) > threshold(y);
+      const threshold = (y) => 0.56 - 0.08 * depthOf(y); // a little more snow nearer the viewer
+      const upright = this.findUprights(lum);
+      const inClump = (x, y) => y >= layout.groundTop && y < H && upright[y * W + x] < 0.5 && clump(x, y) > threshold(y);
       const noAt = (bg.moons || [bg.moon]).filter(Boolean); // never put snow on the moon
       const skyTop = Math.round(layout.horizon * 0.15);
       const layers = [];
@@ -110,9 +113,11 @@
           const tier = Math.floor((1 - n) * TIERS); // high noise: covered first
           // Caps: the top edge of something dark against a lighter background
           // (roofs, branches, fence spikes); on the ground any strong horizontal edge.
+          // Up in the sky only near-black silhouettes count: the night sky and its
+          // clouds are strongly blue, branches and roofs are not.
           const above = lum[i - W];
           const drop = above - lum[i];
-          const edge = ground ? Math.abs(drop) > 26 : drop > 14 && lum[i] < 70;
+          const edge = ground ? Math.abs(drop) > 26 : drop > 14 && lum[i] < 70 && src[i * 4 + 2] < 55;
           if (edge && !noAt.some((m) => Math.hypot(x - m.x, y - m.y) < m.r * 1.6)) {
             const run = Math.abs(lum[i - W - 1] - lum[i - 1]) > 10 || Math.abs(lum[i - W + 1] - lum[i + 1]) > 10; // not a lone star
             if (run) {
@@ -121,7 +126,7 @@
             }
           }
           // Ground: crisp, shaded clumps of snow with a dithered rim.
-          if (ground) {
+          if (ground && upright[i] < 0.5) {
             const c = clump(x, y);
             const thr = threshold(y);
             const ctier = c > thr + 0.1 ? 0 : c > thr + 0.04 ? 1 : 2; // the biggest clumps form first
@@ -134,7 +139,80 @@
         }
       }
       layers.forEach((c, t) => c.getContext('2d').putImageData(data[t], 0, 0));
+      this.blanket = this.buildBlanket(upright, clump);
       return layers;
+    }
+
+    /**
+     * How much of each pixel is something standing on the ground (gravestones,
+     * the bench, tree trunks, bushes, fences), 0..1: snow must not bury those.
+     * The background outlines each one with a polygon; inside an iron fence the
+     * snow behind shows between the bars, so there the darker a pixel the more
+     * it counts as fence.
+     */
+    findUprights(lum) {
+      const { W, H, bg } = this.w;
+      const mask = new Float32Array(W * H);
+      for (const { poly, bars } of bg.uprights || []) {
+        const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
+        const x0 = Math.max(0, Math.floor(Math.min(...xs))), x1 = Math.min(W - 1, Math.ceil(Math.max(...xs)));
+        const y0 = Math.max(0, Math.floor(Math.min(...ys))), y1 = Math.min(H - 1, Math.ceil(Math.max(...ys)));
+        for (let y = y0; y <= y1; y++) {
+          // where this row of pixel centres crosses the outline
+          const cy = y + 0.5;
+          const cross = [];
+          for (let i = 0; i < poly.length; i++) {
+            const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length];
+            if ((ay <= cy) !== (by <= cy)) cross.push(ax + ((cy - ay) / (by - ay)) * (bx - ax));
+          }
+          cross.sort((p, q) => p - q);
+          const inside = [];
+          for (let i = 0; i + 1 < cross.length; i += 2) {
+            for (let x = Math.max(x0, Math.ceil(cross[i] - 0.5)); x <= Math.min(x1, Math.floor(cross[i + 1] - 0.5)); x++) inside.push(x);
+          }
+          if (!bars) { for (const x of inside) mask[y * W + x] = 1; continue; }
+          const row = inside.map((x) => lum[y * W + x]).sort((p, q) => p - q);
+          const lo = row[Math.floor(row.length * 0.25)], hi = row[Math.floor(row.length * 0.7)] + 1;
+          for (const x of inside) {
+            const t = clamp((lum[y * W + x] - lo) / (hi - lo), 0, 1);
+            mask[y * W + x] = Math.max(mask[y * W + x], 1 - t * t * (3 - 2 * t));
+          }
+        }
+      }
+      return mask;
+    }
+
+    /**
+     * The full cover at maximum build-up: the whole ground under snow, up to the
+     * foot of everything standing on it. Those keep their own caps.
+     */
+    buildBlanket(upright, clump) {
+      const { W, H, layout } = this.w;
+      const top = Math.max(1, layout.groundTop - 2);
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const g = c.getContext('2d');
+      const img = g.createImageData(W, H);
+      const d = img.data;
+      for (let y = top; y < H; y++) {
+        const fadeIn = clamp((y - top + 1) / 4, 0, 1); // soft edge along the back of the ground
+        for (let x = 0; x < W; x++) {
+          const i = y * W + x;
+          const open = 1 - upright[i];
+          if (open <= 0) continue;
+          // a dithered rim where the snow meets a solid object, so it hugs it instead of cutting a line
+          const rim = (x > 0 && upright[i - 1] === 1) || (x + 1 < W && upright[i + 1] === 1) || upright[i - W] === 1;
+          if (rim && (x + y) % 2) continue;
+          const t = clamp((clump(x, y) - 0.3) * 2, 0, 1); // gentle drifts: lighter where the clumps were
+          const o = i * 4;
+          d[o] = Math.round(170 + 36 * t);
+          d[o + 1] = Math.round(179 + 35 * t);
+          d[o + 2] = Math.round(222 + 24 * t);
+          d[o + 3] = Math.round((rim ? 0.7 : 0.93) * open * fadeIn * 255);
+        }
+      }
+      g.putImageData(img, 0, 0);
+      return c;
     }
 
     // -----------------------------------------------------------------------
@@ -143,8 +221,8 @@
       if (!this.forced) {
         this.timer -= dt;
         if (this.timer <= 0) {
-          if (this.target > 0) { this.target = 0; this.timer = rnd(rng, 240, 600); }                    // clear spell
-          else { this.begin(rng() < 0.55 ? 'rain' : 'snow'); this.timer = rnd(rng, 150, 360); }  // a shower
+          if (this.target > 0) { this.target = 0; this.timer = rnd(rng, 600, 1500); }                   // clear spell, 10-25 min
+          else { this.begin(rng() < 0.55 ? 'rain' : 'snow'); this.timer = rnd(rng, 180, 420); }  // a shower, 3-7 min
         }
       }
       this.intensity = approach(this.intensity, this.target, FADE * dt);
@@ -203,7 +281,10 @@
     /** On the background, under the characters. */
     drawCover(ctx) {
       if (this.cover <= 0) return;
-      const k = this.cover * TIERS;
+      // Clumps first; near full build-up the blanket fills in underneath them.
+      const b = clamp((this.cover - BLANKET_AT) / (1 - BLANKET_AT), 0, 1);
+      if (b > 0) { ctx.globalAlpha = b; ctx.drawImage(this.blanket, 0, 0); }
+      const k = (this.cover / BLANKET_AT) * TIERS;
       for (let t = 0; t < TIERS; t++) {
         const a = clamp(k - t, 0, 1);
         if (a <= 0) break;

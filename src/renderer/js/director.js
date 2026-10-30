@@ -67,7 +67,7 @@
         ['froslassWaltz', 1.5, () => since('froslassWaltz') > 110],
         ['piplupParade', 1.5, () => since('piplupParade') > 80],
         ['piplupKick', 1.4, () => since('piplupKick') > 100],
-        ['lunatoneVisit', 1.3, () => since('lunatoneVisit') > 140],
+        ['mismagiusSpell', 1.4, () => since('mismagiusSpell') > 120],
         ['chandelureLight', 1.2, () => since('chandelureLight') > 90],
         ['nap', hour >= 1 && hour < 6 ? 6 : 0.3, () => since('nap') > 240],
       ].filter(([, , ok]) => ok());
@@ -150,11 +150,11 @@
 
     *benchRest(w) {
       const b = w.bg.benchSpot;
-      yield* walkGirlTo(w, b.x + 2, b.y + 1);
+      yield* walkGirlTo(w, b.x - 6, b.y + 1);
       w.girl.busy = true;
       w.girl.pose('sit');
       w.girl.facing = 1;
-      w.girl.hover = 6; // up on the seat
+      w.girl.hover = 4; // up on the seat, legs hanging
       const esp = w.pokemon.espeon;
       yield* moveTo(w, esp, b.x - 36, b.y - 2, 12);
       esp.faceToward(b.x);
@@ -167,10 +167,10 @@
 
     *nap(w) {
       const b = w.bg.benchSpot;
-      yield* walkGirlTo(w, b.x + 2, b.y + 1);
+      yield* walkGirlTo(w, b.x - 6, b.y + 1);
       w.girl.busy = true;
       w.girl.pose('sit');
-      w.girl.hover = 6;
+      w.girl.hover = 4;
       const esp = w.pokemon.espeon;
       const pip = w.pokemon.piplup;
       yield* moveTo(w, esp, b.x - 36, b.y - 2, 12);
@@ -437,27 +437,48 @@
       girl.stop();
     },
 
-    *lunatoneVisit(w) {
-      const l = w.pokemon.lunatone;
+    /** Mismagius floats over, circles Luna casting a spell and lifts her off her feet for a moment. */
+    *mismagiusSpell(w) {
+      const m = w.pokemon.mismagius;
       const girl = w.girl;
-      l.busy = true;
+      m.busy = true; m.wanderTarget = null;
+      const side = girl.x < m.x ? 1 : -1;
+      yield* moveTo(w, m, clamp(girl.x + side * 32, w.zone.x0, w.zone.x1), girl.y + 0.5, 15, 1.6);
       girl.busy = true;
-      girl.pose('idle');
-      const spot = { x: girl.x + 30, y: girl.y + 0.5 };
-      const origHover = l.hover;
-      l.hover = 18;
-      l.shadow = true;
-      yield* moveTo(w, l, spot.x, spot.y, 20, 2.2);
-      girl.faceToward(l.x);
-      girl.pose('wave');
-      for (let i = 0; i < 4; i++) { w.particles.burst('sparkle', l.centerX, l.centerY, 2); yield 0.8; }
+      girl.walkTarget = null;
+      girl.faceToward(m.x);
+      m.faceToward(girl.x);
+      girl.pose('startle');
+      w.bubbles.show(girl, 'bang', 0.8);
+      yield 0.8;
+      // the spell: Mismagius circles her, sparkles swirl and she floats up
+      const cx = girl.x;
+      const cy = girl.y;
+      const start = w.time;
+      const spell = (dt) => {
+        const t = w.time - start;
+        const a = t * 2.4;
+        m.x = cx + Math.cos(a) * 30;
+        m.y = cy + Math.sin(a) * 6 + 1;
+        m.facing = Math.sin(a) <= 0 ? 1 : -1;
+        girl.hover = Math.min(14, t * 6) + Math.sin(t * 3) * 1.5;
+        if (w.rng() < dt * 10) w.particles.spawn('sparkleSmall', girl.x + rnd(w.rng, -10, 10), girl.topY + rnd(w.rng, 0, 40), {});
+      };
+      w.steppers.add(spell);
+      girl.pose('happy');
+      yield 4;
+      w.steppers.delete(spell);
+      // gently back down
+      const land = (dt) => { girl.hover = Math.max(0, girl.hover - dt * 10); };
+      w.steppers.add(land);
+      yield until(() => girl.hover === 0, 4);
+      w.steppers.delete(land);
+      w.particles.burst('sparkle', girl.x, girl.y - 4, 3);
+      m.faceToward(girl.x);
       w.bubbles.show(girl, 'heart', 1.4);
-      yield 1;
+      girl.pose('wave');
+      yield 1.4;
       girl.stop();
-      yield* moveTo(w, l, w.bg.moon.x, w.bg.moon.y + origHover, 20, 2.2);
-      l.hover = origHover;
-      l.shadow = false;
-      l.mode = 'orbit';
     },
 
     *chandelureLight(w) {
